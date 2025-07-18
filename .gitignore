@@ -1,0 +1,60 @@
+# .gitignore para Proyectos de Python
+
+# Entornos Virtuales
+# Ignora la carpeta del entorno virtual, comúnmente llamada 'venv' o '.venv'
+/venv/
+/.venv/
+/env/
+/.env/
+/virtual/
+
+# Archivos de caché de Python
+# Estos se generan automáticamente y no deben ser versionados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de configuración de IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de dependencias y compilación
+# Si usas pip-tools
+*.in
+# Si usas poetry o pipenv
+poetry.lock
+Pipfile.lock
+# Archivos de distribución
+/dist/
+/build/
+*.egg-info/
+*.egg
+
+# Archivos de logs
+*.log
+logs/
+
+# Archivos de bases de datos locales
+*.db
+*.sqlite3
+
+# Reportes de pruebas y cobertura
+/htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Archivos de configuración de PyInstaller
+*.spec
+

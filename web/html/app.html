@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LC4 Programmer</title>
+    <link rel="stylesheet" href="/web/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="/assets/img/cormar_logo.png" alt="Logo Cormar" class="sidebar-logo">
+                <span>LC4 Programmer</span>
+                <!-- NUEVO BOTÓN DE REGRESO -->
+                <button class="back-button" onclick="goBackToWelcome()" title="Volver a la pantalla de inicio">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                </button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" id="nav-dashboard" class="active" onclick="showSection('dashboard')">Dashboard</a>
+                <a href="#" id="nav-sequences" onclick="showSection('sequences')">Editor de Secuencias</a>
+                <a href="#" id="nav-plans" onclick="showSection('plans')">Programador de Planes</a>
+                <a href="#" id="nav-config" onclick="showSection('config')">Configuración</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="#">Guardar Global</a>
+                <a href="#">Subir al Controlador</a>
+                <div class="status-indicator disconnected">
+                    Desconectado
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- Secciones de contenido (sin cambios) -->
+            <section id="dashboard-section" class="content-section">
+                <div class="main-header"><h2>Dashboard y Estado General</h2></div>
+                <div class="info-box">
+                    <h4>Información del Controlador</h4>
+                    <p><strong>ID del Controlador:</strong> <span id="info-id">--</span></p>
+                    <p><strong>Fecha del Controlador:</strong> <span id="info-date">--</span></p>
+                    <p><strong>Hora del Controlador:</strong> <span id="info-time">--</span></p>
+                </div>
+            </section>
+            <section id="sequences-section" class="content-section" style="display: none;">
+                <div class="main-header"><h2>Editor de Secuencias</h2></div>
+                <p>Aquí construiremos la línea de tiempo para movimientos y secuencias.</p>
+            </section>
+            <section id="plans-section" class="content-section" style="display: none;">
+                <div class="main-header"><h2>Programador de Planes</h2></div>
+                <p>Aquí visualizaremos el calendario de planes.</p>
+            </section>
+            <section id="config-section" class="content-section" style="display: none;">
+                <div class="main-header"><h2>Configuración del Proyecto</h2></div>
+                <p>Parámetros y ajustes generales del proyecto actual.</p>
+            </section>
+        </main>
+    </div>
+    <script src="/web/js/app.js"></script>
+</body>
+</html>
