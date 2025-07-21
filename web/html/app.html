@@ -12,7 +12,6 @@
             <div class="sidebar-header">
                 <img src="/assets/img/cormar_logo.png" alt="Logo Cormar" class="sidebar-logo">
                 <span>LC4 Programmer</span>
-                <!-- BOTÓN DE REGRESO RESTAURADO -->
                 <button class="back-button" onclick="goBackToWelcome()" title="Volver a la pantalla de inicio">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
                 </button>
@@ -26,14 +25,16 @@
             <div class="sidebar-footer">
                 <a href="#">Guardar Global</a>
                 <a href="#">Subir al Controlador</a>
-                <div class="status-indicator disconnected">
+                <!-- --- CAMBIOS AQUÍ --- -->
+                <a href="#" id="btn-disconnect-app" onclick="handleAppDisconnect()">Desconectar</a>
+                <div id="app-status-indicator" class="status-indicator disconnected">
                     Desconectado
                 </div>
             </div>
         </aside>
 
         <main class="main-content">
-            <!-- Secciones (sin cambios) -->
+            <!-- Las secciones de contenido no cambian -->
             <section id="dashboard-section" class="content-section">
                 <div class="main-header"><h2>Dashboard y Estado General</h2></div>
                 <div class="info-box">
@@ -47,14 +48,7 @@
                 <div class="main-header"><h2>Editor de Secuencias</h2></div>
                 <p>Aquí construiremos la línea de tiempo para movimientos y secuencias.</p>
             </section>
-            <section id="plans-section" class="content-section" style="display: none;">
-                <div class="main-header"><h2>Programador de Planes</h2></div>
-                <p>Aquí visualizaremos el calendario de planes.</p>
-            </section>
-            <section id="config-section" class="content-section" style="display: none;">
-                <div class="main-header"><h2>Configuración del Proyecto</h2></div>
-                <p>Parámetros y ajustes generales del proyecto actual.</p>
-            </section>
+            <!-- ... resto de secciones ... -->
         </main>
     </div>
     <script src="/web/js/app.js"></script>

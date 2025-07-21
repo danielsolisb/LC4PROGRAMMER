@@ -16,6 +16,8 @@ class Communicator:
                 if self.ser and self.ser.is_open:
                     self.ser.close()
                 self.ser = serial.Serial(port, int(baudrate), timeout=1)
+                # Damos un pequeño respiro para que el puerto se estabilice
+                time.sleep(0.1)
                 return {'status': 'success'}
             except serial.SerialException as e:
                 self.ser = None
@@ -49,16 +51,19 @@ class Communicator:
                 self.ser.reset_input_buffer()
                 self.ser.write(frame)
                 print(f"Enviado: {frame.hex().upper()}")
-                time.sleep(0.5) # Pausa crucial para la respuesta
-
-                if self.ser.in_waiting > 0:
-                    response_bytes = self.ser.read(self.ser.in_waiting)
+                
+                # --- SOLUCIÓN DE LECTURA ROBUSTA ---
+                # Leemos hasta recibir un salto de línea, con un timeout de 1 segundo.
+                # Esto es mucho más fiable que una pausa fija.
+                response_bytes = self.ser.read_until(b'\n')
+                
+                if response_bytes:
+                    # Limpiamos la respuesta de caracteres de control y la decodificamos
                     response_text = response_bytes.decode('ascii', errors='replace').strip()
                     print(f"Respuesta Recibida: {response_text}")
                     return {'status': 'success', 'data': response_text}
                 else:
-                    return {'status': 'error', 'message': 'Timeout: No se recibió respuesta.'}
+                    return {'status': 'error', 'message': 'Timeout: No se recibió respuesta del dispositivo.'}
 
             except serial.SerialException as e:
                 return {'status': 'error', 'message': f'Error de comunicación: {e}'}
-
