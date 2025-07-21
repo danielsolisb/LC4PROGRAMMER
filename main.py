@@ -38,28 +38,15 @@ class Api:
     def get_com_ports(self):
         return [port.device for port in serial.tools.list_ports.comports()]
 
-    # --- FUNCIÓN SIMPLIFICADA ---
     def go_to_app_and_capture_data(self):
-        """
-        Paso 1: Captura toda la configuración en segundo plano.
-        Paso 2: Navega a la página de la aplicación.
-        La página se encargará de pedir los datos cuando esté lista.
-        """
         if not window: return
-        
         print("API: Capturando configuración completa en segundo plano...")
         self._controller.capture_full_configuration()
-        
         print("API: Navegando a la aplicación...")
         app_url = f'http://localhost:{PORT}/web/html/app.html'
         window.load_url(app_url)
 
-    # --- NUEVA FUNCIÓN PARA QUE JS LA LLAME ---
     def get_initial_ui_data(self):
-        """
-        Es llamada por app.js cuando está lista.
-        Devuelve los datos del dashboard y el estado de la conexión.
-        """
         print("API: La UI de la app solicitó los datos iniciales.")
         dashboard_data = self._controller.get_dashboard_data()
         dashboard_data['is_connected'] = self._communicator.is_connected
@@ -72,14 +59,34 @@ class Api:
 
     def confirm_and_disconnect(self):
         if not window: return
-        should_disconnect = window.create_confirmation_dialog(
-            'Confirmar Desconexión',
-            '¿Estás seguro de que quieres desconectar y volver al inicio?'
-        )
+        should_disconnect = window.create_confirmation_dialog('Confirmar Desconexión', '¿Estás seguro de que quieres desconectar y volver al inicio?')
         if should_disconnect:
             print("API: Usuario confirmó desconexión.")
             self.disconnect()
             self.go_to_welcome()
+
+    def save_project_file(self):
+        if not window: return
+
+        try:
+            # --- CORRECCIÓN AQUÍ ---
+            # Se ha eliminado el argumento 'title' que no es soportado.
+            filepath = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename="proyecto.lc4",
+                file_types=("Archivos de Proyecto LC4 (*.lc4)", "Todos los archivos (*.*)")
+            )
+
+            if filepath:
+                result = self._controller.save_project_to_file(filepath)
+                return result
+            
+            return {'status': 'info', 'message': 'Guardado cancelado por el usuario.'}
+        except Exception as e:
+            # Capturamos cualquier otro error inesperado para depuración
+            print(f"API: Error inesperado en save_project_file: {e}")
+            return {'status': 'error', 'message': f'Error interno: {e}'}
+
 
 def start_server():
     httpd = socketserver.TCPServer(("", PORT), Handler)
@@ -90,10 +97,7 @@ if __name__ == '__main__':
     server_thread = threading.Thread(target=start_server)
     server_thread.daemon = True
     server_thread.start()
-    
     api = Api()
     start_url = f'http://localhost:{PORT}/web/html/welcome.html'
-    
     window = webview.create_window('Cormar - Controlador Semafórico', start_url, js_api=api, width=880, height=620, resizable=True)
-    
     webview.start(debug=True)
