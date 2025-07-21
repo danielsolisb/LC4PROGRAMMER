@@ -1,40 +1,72 @@
-/**
- * --- LÓGICA DE INICIALIZACIÓN PRINCIPAL ---
- * Se ejecuta una sola vez cuando la página está completamente cargada y la API de Python está lista.
- */
-window.addEventListener('pywebviewready', async () => {
-    // --- CORRECCIÓN AQUÍ ---
-    // Verificación defensiva: ¿Estamos realmente en la página de la app?
-    // Usamos document.querySelector para buscar por CLASE, no por ID.
-    if (!document.querySelector('.app-container')) {
-        // Si no estamos en la app, no hacemos nada. Esto evita errores de sincronización.
-        return; 
-    }
+// web/js/app.js (Solución Definitiva)
 
-    console.log("App.js: pywebview está listo. Solicitando datos iniciales a Python...");
+// Banderas de estado para la inicialización segura.
+let domReady = false;
+let apiReady = false;
+
+/**
+ * Lógica asíncrona principal. Obtiene los datos del backend y actualiza la UI.
+ * Esta función es 'async' para poder usar 'await'.
+ */
+async function runAsyncInitialization() {
+    console.log("runAsyncInitialization: Ejecutando. Solicitando datos al backend...");
     try {
         const initialState = await window.pywebview.api.get_initial_ui_data();
-        console.log("App.js: Datos iniciales recibidos.", initialState);
-        
+        console.log("Datos iniciales recibidos:", initialState);
+
         if (initialState) {
-            document.getElementById('info-id').textContent = initialState.controller_id || 'No disponible';
-            document.getElementById('info-date').textContent = initialState.date || 'No disponible';
-            document.getElementById('info-time').textContent = initialState.time || 'No disponible';
-            
+            document.getElementById('info-id').textContent = initialState.controller_id || 'N/A';
+            document.getElementById('info-date').textContent = initialState.date || 'N/A';
+            document.getElementById('info-time').textContent = initialState.time || 'N/A';
             updateAppConnectionStatus(initialState.is_connected);
         }
     } catch (e) {
-        console.error("App.js: Error fatal al obtener datos iniciales.", e);
+        console.error("Error fatal al obtener datos iniciales:", e);
+        document.getElementById('info-id').textContent = 'Error de Carga';
     }
+}
+
+/**
+ * Función de verificación SÍNCRONA. Se llama después de cada evento clave.
+ * Su único trabajo es comprobar si todo está listo y disparar la lógica asíncrona
+ * de una manera que no devuelva la Promise.
+ */
+function tryToInitialize() {
+    console.log(`tryToInitialize: Verificando estados -> DOM Listo: ${domReady}, API Lista: ${apiReady}`);
     
-    showSection('dashboard');
+    // El "cerrojo de doble llave": solo proceder si ambas banderas son verdaderas.
+    if (domReady && apiReady) {
+        console.log("¡Ambas condiciones cumplidas! Lanzando la inicialización.");
+        
+        // Patrón "Fire-and-Forget": llamamos a la función async pero no la esperamos (await),
+        // lo que evita que la Promise se propague hacia arriba.
+        runAsyncInitialization().catch(e => {
+            // Agregamos un .catch aquí por si la propia Promise falla,
+            // para que el error se muestre en la consola de JS y no se pierda.
+            console.error("Error no controlado en la ejecución asíncrona:", e);
+        });
+    }
+}
+
+// --- CONFIGURACIÓN DE LOS EVENT LISTENERS ---
+
+// 1. Esperamos a que el DOM (la estructura HTML) esté listo.
+window.addEventListener('DOMContentLoaded', () => {
+    console.log("EVENTO: DOMContentLoaded -> El DOM está listo.");
+    domReady = true; // Giramos la primera llave.
+    tryToInitialize(); // Verificamos si la otra llave ya estaba girada.
+});
+
+// 2. Esperamos a que la API de pywebview esté lista.
+window.addEventListener('pywebviewready', () => {
+    console.log("EVENTO: pywebviewready -> La API de Python está lista.");
+    apiReady = true; // Giramos la segunda llave.
+    tryToInitialize(); // Verificamos si la otra llave ya estaba girada.
 });
 
 
-/**
- * Actualiza la UI del indicador de estado.
- * @param {boolean} isConnected - El estado de la conexión.
- */
+// --- FUNCIONES AUXILIARES (sin cambios) ---
+
 function updateAppConnectionStatus(isConnected) {
     const statusIndicator = document.getElementById('app-status-indicator');
     if (!statusIndicator) return;
@@ -47,32 +79,22 @@ function updateAppConnectionStatus(isConnected) {
     }
 }
 
-/**
- * Llama a la API de Python para guardar el proyecto.
- */
 async function handleSaveGlobal() {
     console.log("JS: Solicitando a Python que guarde el proyecto...");
     try {
         const result = await window.pywebview.api.save_project_file();
-        alert(result.message); 
+        alert(result.message);
     } catch (e) {
         console.error("Error al intentar guardar el proyecto:", e);
         alert("Ocurrió un error inesperado al guardar el proyecto.");
     }
 }
 
-/**
- * Maneja el clic en el botón de desconectar. Delega toda la lógica a Python.
- */
 async function handleAppDisconnect() {
     console.log("JS: Solicitando a Python que maneje la desconexión...");
     await window.pywebview.api.confirm_and_disconnect();
 }
 
-/**
- * Muestra una sección principal y actualiza la navegación.
- * @param {string} sectionId - El ID de la sección a mostrar.
- */
 function showSection(sectionId) {
     const sections = document.querySelectorAll('.content-section');
     sections.forEach(section => { section.style.display = 'none'; });
@@ -84,9 +106,6 @@ function showSection(sectionId) {
     if (activeLink) { activeLink.classList.add('active'); }
 }
 
-/**
- * Llama a la API de Python para volver a la pantalla de bienvenida.
- */
 async function goBackToWelcome() {
     console.log("Regresando a la pantalla de bienvenida...");
     await window.pywebview.api.go_to_welcome();
