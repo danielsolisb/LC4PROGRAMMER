@@ -66,7 +66,6 @@
         const baudRateSelect = document.getElementById('baud-rate');
         const captureCard = document.getElementById('card-capture');
 
-        // Función para abrir el modal y cargar los puertos COM
         async function openOptionsModal() {
             try {
                 const ports = await window.pywebview.api.get_com_ports();
@@ -88,7 +87,6 @@
             modal.classList.remove('visible');
         }
 
-        // Lógica de conexión
         async function handleConnect() {
             const port = comPortSelect.value;
             const baudrate = baudRateSelect.value;
@@ -103,20 +101,19 @@
             updateUIState();
         }
 
-        // Lógica de desconexión
         async function handleDisconnect() {
             await window.pywebview.api.disconnect();
             alert("Desconectado.");
             updateUIState();
         }
         
-        // Función de captura que ahora llama a la lógica centralizada
         async function handleCapture() {
             console.log("Iniciando aplicación y captura de datos...");
-            await window.pywebview.api.go_to_app_and_load_data();
+            // --- CORRECCIÓN AQUÍ ---
+            // Cambiamos el nombre de la función a la correcta que existe en main.py
+            await window.pywebview.api.go_to_app_and_capture_data();
         }
 
-        // Función para actualizar el estado de toda la UI de esta página
         async function updateUIState() {
             const status = await window.pywebview.api.get_connection_status();
             const isConnected = status.is_connected;
@@ -130,11 +127,9 @@
             comPortSelect.disabled = isConnected;
             baudRateSelect.disabled = isConnected;
 
-            // La tarjeta de "Capturar" se habilita solo si estamos conectados
             captureCard.classList.toggle('disabled', !isConnected);
         }
 
-        // El evento para actualizar el estado al cargar es crucial
         window.addEventListener('pywebviewready', updateUIState);
     </script>
 </body>
