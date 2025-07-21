@@ -1,71 +1,80 @@
-// web/js/app.js (Solución Definitiva)
+// web/js/app.js
 
-// Banderas de estado para la inicialización segura.
-let domReady = false;
-let apiReady = false;
+// Este objeto contendrá toda la configuración del proyecto
+let projectData = {};
 
-/**
- * Lógica asíncrona principal. Obtiene los datos del backend y actualiza la UI.
- * Esta función es 'async' para poder usar 'await'.
- */
-async function runAsyncInitialization() {
-    console.log("runAsyncInitialization: Ejecutando. Solicitando datos al backend...");
-    try {
-        const initialState = await window.pywebview.api.get_initial_ui_data();
-        console.log("Datos iniciales recibidos:", initialState);
 
-        if (initialState) {
-            document.getElementById('info-id').textContent = initialState.controller_id || 'N/A';
-            document.getElementById('info-date').textContent = initialState.date || 'N/A';
-            document.getElementById('info-time').textContent = initialState.time || 'N/A';
-            updateAppConnectionStatus(initialState.is_connected);
-        }
-    } catch (e) {
-        console.error("Error fatal al obtener datos iniciales:", e);
-        document.getElementById('info-id').textContent = 'Error de Carga';
-    }
-}
-
-/**
- * Función de verificación SÍNCRONA. Se llama después de cada evento clave.
- * Su único trabajo es comprobar si todo está listo y disparar la lógica asíncrona
- * de una manera que no devuelva la Promise.
- */
-function tryToInitialize() {
-    console.log(`tryToInitialize: Verificando estados -> DOM Listo: ${domReady}, API Lista: ${apiReady}`);
-    
-    // El "cerrojo de doble llave": solo proceder si ambas banderas son verdaderas.
-    if (domReady && apiReady) {
-        console.log("¡Ambas condiciones cumplidas! Lanzando la inicialización.");
-        
-        // Patrón "Fire-and-Forget": llamamos a la función async pero no la esperamos (await),
-        // lo que evita que la Promise se propague hacia arriba.
-        runAsyncInitialization().catch(e => {
-            // Agregamos un .catch aquí por si la propia Promise falla,
-            // para que el error se muestre en la consola de JS y no se pierda.
-            console.error("Error no controlado en la ejecución asíncrona:", e);
-        });
-    }
-}
-
-// --- CONFIGURACIÓN DE LOS EVENT LISTENERS ---
-
-// 1. Esperamos a que el DOM (la estructura HTML) esté listo.
-window.addEventListener('DOMContentLoaded', () => {
-    console.log("EVENTO: DOMContentLoaded -> El DOM está listo.");
-    domReady = true; // Giramos la primera llave.
-    tryToInitialize(); // Verificamos si la otra llave ya estaba girada.
-});
-
-// 2. Esperamos a que la API de pywebview esté lista.
+// --- Lógica de Inicialización ---
 window.addEventListener('pywebviewready', () => {
-    console.log("EVENTO: pywebviewready -> La API de Python está lista.");
-    apiReady = true; // Giramos la segunda llave.
-    tryToInitialize(); // Verificamos si la otra llave ya estaba girada.
+    console.log("EVENTO: pywebviewready -> La API y el DOM están listos.");
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'capture') {
+        runCaptureFlow();
+    } else {
+        runNormalInitialization();
+    }
 });
 
 
-// --- FUNCIONES AUXILIARES (sin cambios) ---
+/**
+ * Esta función es llamada DIRECTAMENTE por Python cuando la captura ha finalizado.
+ * @param {object} fullProjectData - El objeto JS con TODOS los datos del proyecto.
+ */
+function onCaptureComplete(fullProjectData) {
+    console.log("Función onCaptureComplete llamada por Python. Datos COMPLETOS recibidos:", fullProjectData);
+    
+    // 1. Almacenamos el objeto completo en nuestra variable global.
+    projectData = fullProjectData;
+
+    // 2. Actualizamos la UI del dashboard usando la información del objeto completo.
+    // Pasamos la sección 'info' y el estado de conexión a la función de actualización.
+    updateDashboard(projectData.info, projectData.is_connected);
+
+    // 3. Ocultar el modal de carga.
+    const modal = document.getElementById('loading-modal');
+    modal.classList.remove('visible');
+}
+
+
+async function runCaptureFlow() {
+    const modal = document.getElementById('loading-modal');
+    try {
+        modal.classList.add('visible');
+        console.log("Iniciando captura de datos desde el backend...");
+        // La llamada a Python no cambia, solo lo que Python hace internamente.
+        await window.pywebview.api.perform_full_capture();
+    } catch (e) {
+        console.error("Error al invocar la captura:", e);
+        alert("Ocurrió un error al iniciar la captura. Revise la consola.");
+        modal.classList.remove('visible');
+    }
+}
+
+// --- FUNCIÓN MODIFICADA ---
+// Ahora la función de actualización del dashboard es más específica.
+/**
+ * Actualiza los elementos del dashboard.
+ * @param {object} infoData - El objeto 'info' del proyecto.
+ * @param {boolean} isConnected - El estado de la conexión.
+ */
+function updateDashboard(infoData, isConnected) {
+    if (infoData) {
+        document.getElementById('info-id').textContent = infoData.controller_id || 'N/A';
+        document.getElementById('info-date').textContent = infoData.date || 'N/A';
+        document.getElementById('info-time').textContent = infoData.time || 'N/A';
+    }
+    // El estado de conexión se maneja por separado.
+    updateAppConnectionStatus(isConnected);
+}
+
+// --- El resto de las funciones no necesitan cambios ---
+
+async function runNormalInitialization() {
+    console.log("Inicialización normal: No se realizó captura.");
+    // En un futuro, aquí se podría cargar un archivo de proyecto.
+    // Por ahora, simplemente muestra la UI vacía.
+    updateDashboard({}, false);
+}
 
 function updateAppConnectionStatus(isConnected) {
     const statusIndicator = document.getElementById('app-status-indicator');
@@ -81,6 +90,7 @@ function updateAppConnectionStatus(isConnected) {
 
 async function handleSaveGlobal() {
     console.log("JS: Solicitando a Python que guarde el proyecto...");
+    // No se necesita enviar datos, Python ya los tiene en self._controller.project_data
     try {
         const result = await window.pywebview.api.save_project_file();
         alert(result.message);
@@ -96,14 +106,20 @@ async function handleAppDisconnect() {
 }
 
 function showSection(sectionId) {
-    const sections = document.querySelectorAll('.content-section');
-    sections.forEach(section => { section.style.display = 'none'; });
-    const navLinks = document.querySelectorAll('.sidebar-nav a');
-    navLinks.forEach(link => { link.classList.remove('active'); });
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = 'none';
+    });
+    document.querySelectorAll('.sidebar-nav a').forEach(link => {
+        link.classList.remove('active');
+    });
     const activeSection = document.getElementById(sectionId + '-section');
-    if (activeSection) { activeSection.style.display = 'block'; }
+    if (activeSection) {
+        activeSection.style.display = 'block';
+    }
     const activeLink = document.getElementById('nav-' + sectionId);
-    if (activeLink) { activeLink.classList.add('active'); }
+    if (activeLink) {
+        activeLink.classList.add('active');
+    }
 }
 
 async function goBackToWelcome() {

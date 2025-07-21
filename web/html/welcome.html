@@ -108,10 +108,10 @@
         }
         
         async function handleCapture() {
-            console.log("Iniciando aplicación y captura de datos...");
-            // --- CORRECCIÓN AQUÍ ---
-            // Cambiamos el nombre de la función a la correcta que existe en main.py
-            await window.pywebview.api.go_to_app_and_capture_data();
+            console.log("Iniciando navegación a la app para capturar datos...");
+            // --- CAMBIO AQUÍ ---
+            // Ahora llamamos a la nueva función de Python que solo navega.
+            await window.pywebview.api.request_capture_and_navigate();
         }
 
         async function updateUIState() {
