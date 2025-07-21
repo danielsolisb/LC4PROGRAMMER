@@ -3,66 +3,43 @@ import http.server
 import socketserver
 import threading
 import serial.tools.list_ports
-from controller import Controller
 import json
+from communicator import Communicator # Importamos nuestra nueva clase
 
 PORT = 8000
 
 class Api:
     def __init__(self):
-        self.com_port = None
-        self.baud_rate = 9600
-        # --- CORRECCIÓN AQUÍ: Hacemos el controlador "privado" ---
-        # El guion bajo evita que pywebview lo inspeccione y cause errores.
-        self._controller = Controller()
+        self._communicator = Communicator() # Instancia única y privada
 
-    def open_file_dialog(self):
-        window = webview.windows[0]
-        result = window.create_file_dialog(webview.OPEN_DIALOG)
-        if result: print(f"Archivo seleccionado: {result[0]}")
-        else: print("Ningún archivo seleccionado.")
-        return result
+    def connect(self, port, baudrate):
+        """Intenta conectar usando el communicator."""
+        print(f"API: Intentando conectar a {port}...")
+        return self._communicator.connect(port, baudrate)
 
-    def navigate(self, screen, mode=''):
-        print(f"Botón presionado: '{screen}' con modo '{mode}'")
-        if screen == 'open':
-            self.open_file_dialog()
-            return None
-        elif screen in ('new', 'capture'):
-            if mode == 'capture':
-                if not self.com_port:
-                    message = "Error: Por favor, configure un puerto COM en Opciones primero."
-                    webview.windows[0].evaluate_js(f'alert({json.dumps(message)})')
-                    return None
-                
-                result = self._controller.connect_and_capture_id(self.com_port, self.baud_rate)
-                
-                if result['status'] == 'error':
-                    message = f"Error de Captura: {result['message']}"
-                    webview.windows[0].evaluate_js(f'alert({json.dumps(message)})')
-                    return None
-            
-            return f'http://localhost:{PORT}/web/html/app.html?mode={mode}'
-        return None
+    def disconnect(self):
+        """Desconecta usando el communicator."""
+        print("API: Desconectando...")
+        return self._communicator.disconnect()
 
-    # --- FUNCIÓN DE REGRESO RESTAURADA ---
-    def go_to_welcome(self):
-        """Devuelve la URL de la pantalla de bienvenida."""
-        return f'http://localhost:{PORT}/web/html/welcome.html'
+    def get_connection_status(self):
+        """Devuelve el estado de la conexión al frontend."""
+        return {'is_connected': self._communicator.is_connected}
+
+    def capture_id(self):
+        """
+        Envía el comando para leer el ID usando la conexión existente.
+        """
+        print("API: Solicitando ID del controlador...")
+        response = self._communicator.send_command(0x11)
+        print(f"API: Respuesta de captura: {response}")
+        return response
 
     def get_com_ports(self):
         return [port.device for port in serial.tools.list_ports.comports()]
 
-    def save_serial_settings(self, port, baudrate):
-        self.com_port = port
-        self.baud_rate = baudrate
-        print(f"--- Configuración Serie Guardada ---\n  Puerto: {self.com_port}\n  Velocidad: {self.baud_rate} baud\n---------------------------------")
-    
-    def save_ip_settings(self, ip, port):
-        print(f"--- Configuración de Red Guardada ---\n  Dirección IP: {ip}\n  Puerto de Red: {port}\n----------------------------------")
-
-    def get_dashboard_data(self):
-        return self._controller.captured_data
+    # Las funciones navigate, save_settings, etc. ya no son necesarias aquí
+    # porque la lógica se manejará desde el frontend.
 
 def start_server():
     Handler = http.server.SimpleHTTPRequestHandler
@@ -76,5 +53,5 @@ if __name__ == '__main__':
     server_thread.start()
     api = Api()
     start_url = f'http://localhost:{PORT}/web/html/welcome.html'
-    window = webview.create_window('Cormar - Controlador Semafórico', start_url, js_api=api, width=1024, height=768, resizable=True)
-    webview.start(debug=False)
+    window = webview.create_window('Cormar - Controlador Semafórico', start_url, js_api=api, width=880, height=620, resizable=True)
+    webview.start(debug=True) # Activamos debug para facilitar las pruebas

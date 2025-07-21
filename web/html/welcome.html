@@ -2,125 +2,133 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bienvenida - Cormar</title>
     <style>
-        /* Estilos (sin cambios) */
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f0f2f5; }
-        .container { width: 100%; max-width: 800px; text-align: center; padding: 20px; position: relative; }
-        .logo-container { margin-bottom: 50px; }
-        .logo { max-width: 300px; height: auto; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-family: system-ui, sans-serif; background-color: #f0f2f5; }
+        .container { width: 100%; max-width: 800px; text-align: center; padding: 20px; }
+        .logo { max-width: 300px; height: auto; margin-bottom: 50px; }
         .options-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-        .option-card { background-color: #2c3e50; color: #ecf0f1; border-radius: 12px; padding: 25px 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
-        .option-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); }
+        .option-card { background-color: #2c3e50; color: #ecf0f1; border-radius: 12px; padding: 25px 15px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .option-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+        .option-card.disabled { background-color: #7f8c8d; cursor: not-allowed; opacity: 0.6; }
         .option-card svg { width: 48px; height: 48px; margin-bottom: 15px; fill: #ecf0f1; }
-        .option-card span { font-size: 1.1em; font-weight: 500; }
-        @media (max-width: 600px) { .options-grid { grid-template-columns: repeat(2, 1fr); } }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; transition: opacity 0.3s ease; }
-        .modal-content { background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 90%; max-width: 500px; text-align: left; }
-        .modal-content h3 { margin-top: 0; color: #2c3e50; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
-        .modal-group { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        .form-row { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay.visible { display: flex; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; }
+        .modal-content h3 { margin-top: 0; }
+        .form-row { display: flex; align-items: center; margin-bottom: 15px; gap: 10px; }
         .form-row label { font-weight: bold; min-width: 100px; }
-        .form-row select, .form-row input { flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 1em; }
-        .modal-actions { text-align: right; margin-top: 20px; }
-        .modal-actions button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; }
-        .btn-save { background-color: #28a745; color: white; }
-        .btn-close { background-color: #6c757d; color: white; margin-left: 10px; }
-        .hidden { display: none; }
+        .form-row select { flex-grow: 1; padding: 8px; }
+        .modal-actions { text-align: right; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status-indicator { font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; }
+        .status-indicator.disconnected { background-color: #e74c3c; }
+        .status-indicator.connected { background-color: #2ecc71; }
+        .modal-actions .buttons { display: flex; gap: 10px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; }
+        .btn-connect { background-color: #28a745; color: white; }
+        .btn-disconnect { background-color: #e74c3c; color: white; }
+        .btn-close { background-color: #6c757d; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo-container">
-            <img src="/assets/img/cormar_logo.png" alt="Logo Cormar" class="logo">
-        </div>
+        <img src="/assets/img/cormar_logo.png" alt="Logo Cormar" class="logo">
         <div class="options-grid">
-            <div class="option-card" onclick="handleNavigation('new', 'new')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-                <span>Nuevo</span>
-            </div>
-            <div class="option-card" onclick="handleNavigation('open')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"/></svg>
-                <span>Abrir</span>
-            </div>
-            <div class="option-card" onclick="handleNavigation('capture', 'capture')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                <span>Capturar</span>
-            </div>
-            <div class="option-card" onclick="openOptionsModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61-.25-1.17-.59-1.69-.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19-.15-.24-.42-.12.64l2 3.46c.12-.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59-1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22-.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
-                <span>Opciones</span>
-            </div>
+            <div id="card-new" class="option-card disabled"><span>Nuevo</span></div>
+            <div id="card-open" class="option-card disabled"><span>Abrir</span></div>
+            <div id="card-capture" class="option-card disabled" onclick="handleCapture()"><span>Capturar</span></div>
+            <div class="option-card" onclick="openOptionsModal()"><span>Opciones</span></div>
         </div>
     </div>
-    <div id="options-modal" class="modal-overlay hidden">
+
+    <div id="options-modal" class="modal-overlay">
         <div class="modal-content">
             <h3>Configuración de Comunicación</h3>
-            <div class="modal-group">
-                <h4>USB (Puerto COM)</h4>
-                <div class="form-row"><label for="com-port">Puerto:</label><select id="com-port"></select></div>
-                <div class="form-row"><label for="baud-rate">Velocidad:</label><select id="baud-rate"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select></div>
-            </div>
-            <div class="modal-group">
-                <h4>Red (IP)</h4>
-                <div class="form-row"><label for="ip-address">Dirección IP:</label><input type="text" id="ip-address" placeholder="Ej: 192.168.1.100"></div>
-                <div class="form-row"><label for="ip-port">Puerto:</label><input type="number" id="ip-port" placeholder="Ej: 8080"></div>
-            </div>
+            <div class="form-row"><label for="com-port">Puerto:</label><select id="com-port"></select></div>
+            <div class="form-row"><label for="baud-rate">Velocidad:</label><select id="baud-rate"><option>9600</option><option>19200</option><option>115200</option></select></div>
             <div class="modal-actions">
-                <button class="btn-save" onclick="saveSettings()">Guardar Cambios</button>
-                <button class="btn-close" onclick="closeOptionsModal()">Cerrar</button>
+                <div id="status-indicator" class="status-indicator disconnected">Desconectado</div>
+                <div class="buttons">
+                    <button id="btn-connect" class="btn-connect" onclick="handleConnect()">Conectar</button>
+                    <button id="btn-disconnect" class="btn-disconnect" onclick="handleDisconnect()" style="display: none;">Desconectar</button>
+                    <button class="btn-close" onclick="closeOptionsModal()">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- SCRIPT COMPLETO CON TODAS LAS FUNCIONES ---
-
-        // Función para navegar a la página principal
-        async function handleNavigation(screenName, mode = '') {
-            const url = await window.pywebview.api.navigate(screenName, mode);
-            if (url) {
-                window.location.href = url;
-            }
-        }
-
-        // --- FUNCIONES DEL MODAL RESTAURADAS ---
+        // --- Lógica de UI y Comunicación ---
         const modal = document.getElementById('options-modal');
+        const statusIndicator = document.getElementById('status-indicator');
+        const btnConnect = document.getElementById('btn-connect');
+        const btnDisconnect = document.getElementById('btn-disconnect');
         const comPortSelect = document.getElementById('com-port');
+        const baudRateSelect = document.getElementById('baud-rate');
+        const captureCard = document.getElementById('card-capture');
 
         async function openOptionsModal() {
             const ports = await window.pywebview.api.get_com_ports();
             comPortSelect.innerHTML = '';
-            if (ports.length > 0) {
-                ports.forEach(port => {
-                    const option = document.createElement('option');
-                    option.value = port;
-                    option.textContent = port;
-                    comPortSelect.appendChild(option);
-                });
-            } else {
-                const option = document.createElement('option');
-                option.textContent = 'No se encontraron puertos';
-                comPortSelect.appendChild(option);
-            }
-            modal.classList.remove('hidden');
+            ports.forEach(p => comPortSelect.add(new Option(p, p)));
+            modal.classList.add('visible');
+            updateUIState();
         }
 
         function closeOptionsModal() {
-            modal.classList.add('hidden');
+            modal.classList.remove('visible');
         }
 
-        function saveSettings() {
-            const selectedComPort = document.getElementById('com-port').value;
-            const selectedBaudRate = document.getElementById('baud-rate').value;
-            const ipAddress = document.getElementById('ip-address').value;
-            const ipPort = document.getElementById('ip-port').value;
-            window.pywebview.api.save_serial_settings(selectedComPort, selectedBaudRate);
-            window.pywebview.api.save_ip_settings(ipAddress, ipPort);
-            alert('Configuración guardada (revisa la consola de Python).');
-            closeOptionsModal();
+        async function handleConnect() {
+            const port = comPortSelect.value;
+            const baudrate = baudRateSelect.value;
+            if (!port) { alert("Por favor, seleccione un puerto."); return; }
+            
+            const result = await window.pywebview.api.connect(port, baudrate);
+            if (result.status === 'success') {
+                alert("Conectado exitosamente.");
+            } else {
+                alert(`Error al conectar: ${result.message}`);
+            }
+            updateUIState();
         }
+
+        async function handleDisconnect() {
+            await window.pywebview.api.disconnect();
+            alert("Desconectado.");
+            updateUIState();
+        }
+
+        async function handleCapture() {
+            console.log("Iniciando captura de ID...");
+            const result = await window.pywebview.api.capture_id();
+            if (result.status === 'success') {
+                alert(`ID Capturado: ${result.data}`);
+                // Aquí, en el futuro, navegaremos a la app principal
+                // window.location.href = '/web/html/app.html';
+            } else {
+                alert(`Error al capturar: ${result.message}`);
+            }
+        }
+
+        async function updateUIState() {
+            const status = await window.pywebview.api.get_connection_status();
+            const isConnected = status.is_connected;
+
+            statusIndicator.textContent = isConnected ? 'Conectado' : 'Desconectado';
+            statusIndicator.className = `status-indicator ${isConnected ? 'connected' : 'disconnected'}`;
+            
+            btnConnect.style.display = isConnected ? 'none' : 'block';
+            btnDisconnect.style.display = isConnected ? 'block' : 'none';
+            
+            comPortSelect.disabled = isConnected;
+            baudRateSelect.disabled = isConnected;
+
+            captureCard.classList.toggle('disabled', !isConnected);
+        }
+
+        // Actualiza el estado al cargar
+        window.addEventListener('pywebviewready', updateUIState);
     </script>
 </body>
 </html>

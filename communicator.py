@@ -3,66 +3,62 @@ import time
 import threading
 
 class Communicator:
+    """
+    Gestiona la comunicación persistente con el puerto serie.
+    """
     def __init__(self):
         self.ser = None
         self.lock = threading.Lock()
-        self.STX = bytes([0x43, 0x53, 0x4F])
-        self.ETX = bytes([0x03, 0xFF])
 
-    def connect(self, port, baudrate=9600):
-        try:
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-            self.ser = serial.Serial(port, int(baudrate), timeout=0.5)
-            print(f"Conectado a {port} a {baudrate} baud.")
-            return {'status': 'success'}
-        except serial.SerialException as e:
-            print(f"Error de Conexión: {e}")
-            return {'status': 'error', 'message': str(e)}
+    def connect(self, port, baudrate):
+        with self.lock:
+            try:
+                if self.ser and self.ser.is_open:
+                    self.ser.close()
+                self.ser = serial.Serial(port, int(baudrate), timeout=1)
+                return {'status': 'success'}
+            except serial.SerialException as e:
+                self.ser = None
+                return {'status': 'error', 'message': str(e)}
 
     def disconnect(self):
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        print("Desconectado del puerto COM.")
+        with self.lock:
+            if self.ser and self.ser.is_open:
+                self.ser.close()
+                self.ser = None
+            return {'status': 'success'}
+
+    @property
+    def is_connected(self):
+        return self.ser is not None and self.ser.is_open
 
     def _build_frame(self, cmd_byte, data_payload=b''):
+        STX = bytes([0x43, 0x53, 0x4F])
+        ETX = bytes([0x03, 0xFF])
         len_byte = len(data_payload)
         checksum = (cmd_byte + len_byte + sum(data_payload)) % 256
-        return self.STX + bytes([cmd_byte, len_byte]) + data_payload + bytes([checksum]) + self.ETX
+        return STX + bytes([cmd_byte, len_byte]) + data_payload + bytes([checksum]) + ETX
 
     def send_command(self, cmd_byte, data_payload=b''):
-        if not (self.ser and self.ser.is_open):
-            return {'status': 'error', 'message': 'No conectado a un puerto COM.'}
-        
+        if not self.is_connected:
+            return {'status': 'error', 'message': 'No hay una conexión activa.'}
+
         with self.lock:
             frame = self._build_frame(cmd_byte, data_payload)
             try:
                 self.ser.reset_input_buffer()
                 self.ser.write(frame)
                 print(f"Enviado: {frame.hex().upper()}")
-                
-                # --- CORRECCIÓN AQUÍ: Añadimos una pequeña pausa ---
-                # Damos tiempo al controlador para procesar y responder.
-                time.sleep(0.3)
-                
-                response_bytes = self.ser.read_until(self.ETX)
-                
-                if not response_bytes:
+                time.sleep(0.5) # Pausa crucial para la respuesta
+
+                if self.ser.in_waiting > 0:
+                    response_bytes = self.ser.read(self.ser.in_waiting)
+                    response_text = response_bytes.decode('ascii', errors='replace').strip()
+                    print(f"Respuesta Recibida: {response_text}")
+                    return {'status': 'success', 'data': response_text}
+                else:
                     return {'status': 'error', 'message': 'Timeout: No se recibió respuesta.'}
-                
-                if response_bytes.startswith(self.STX) and response_bytes.endswith(self.ETX):
-                    print(f"Recibida Trama: {response_bytes.hex().upper()}")
-                    resp_cmd = response_bytes[3]
-                    resp_payload = response_bytes[5:5+response_bytes[4]]
-                    
-                    if resp_cmd == 0x06: # ACK
-                        return {'status': 'success', 'type': 'ack', 'data': resp_payload}
-                    elif resp_cmd == 0x15: # NACK
-                        return {'status': 'error', 'type': 'nack', 'message': f'Error NACK recibido: {resp_payload.hex()}'}
-                
-                response_text = response_bytes.decode('ascii', errors='replace').strip()
-                print(f"Recibido Texto: {response_text}")
-                return {'status': 'success', 'type': 'text', 'data': response_text}
 
             except serial.SerialException as e:
                 return {'status': 'error', 'message': f'Error de comunicación: {e}'}
+
