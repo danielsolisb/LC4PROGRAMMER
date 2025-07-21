@@ -58,7 +58,6 @@
     </div>
 
     <script>
-        // --- Lógica de UI y Comunicación ---
         const modal = document.getElementById('options-modal');
         const statusIndicator = document.getElementById('status-indicator');
         const btnConnect = document.getElementById('btn-connect');
@@ -67,18 +66,29 @@
         const baudRateSelect = document.getElementById('baud-rate');
         const captureCard = document.getElementById('card-capture');
 
+        // Función para abrir el modal y cargar los puertos COM
         async function openOptionsModal() {
-            const ports = await window.pywebview.api.get_com_ports();
-            comPortSelect.innerHTML = '';
-            ports.forEach(p => comPortSelect.add(new Option(p, p)));
-            modal.classList.add('visible');
-            updateUIState();
+            try {
+                const ports = await window.pywebview.api.get_com_ports();
+                comPortSelect.innerHTML = '';
+                if (ports && ports.length > 0) {
+                    ports.forEach(p => comPortSelect.add(new Option(p, p)));
+                } else {
+                    comPortSelect.add(new Option("No se encontraron puertos", ""));
+                }
+                modal.classList.add('visible');
+                updateUIState();
+            } catch (e) {
+                console.error("Error al obtener puertos COM:", e);
+                alert("Error al obtener la lista de puertos. Revisa la consola de Python.");
+            }
         }
 
         function closeOptionsModal() {
             modal.classList.remove('visible');
         }
 
+        // Lógica de conexión
         async function handleConnect() {
             const port = comPortSelect.value;
             const baudrate = baudRateSelect.value;
@@ -93,24 +103,20 @@
             updateUIState();
         }
 
+        // Lógica de desconexión
         async function handleDisconnect() {
             await window.pywebview.api.disconnect();
             alert("Desconectado.");
             updateUIState();
         }
-
+        
+        // Función de captura que ahora llama a la lógica centralizada
         async function handleCapture() {
-            console.log("Iniciando captura de ID...");
-            const result = await window.pywebview.api.capture_id();
-            if (result.status === 'success') {
-                alert(`ID Capturado: ${result.data}`);
-                // Aquí, en el futuro, navegaremos a la app principal
-                // window.location.href = '/web/html/app.html';
-            } else {
-                alert(`Error al capturar: ${result.message}`);
-            }
+            console.log("Iniciando aplicación y captura de datos...");
+            await window.pywebview.api.go_to_app_and_load_data();
         }
 
+        // Función para actualizar el estado de toda la UI de esta página
         async function updateUIState() {
             const status = await window.pywebview.api.get_connection_status();
             const isConnected = status.is_connected;
@@ -124,10 +130,11 @@
             comPortSelect.disabled = isConnected;
             baudRateSelect.disabled = isConnected;
 
+            // La tarjeta de "Capturar" se habilita solo si estamos conectados
             captureCard.classList.toggle('disabled', !isConnected);
         }
 
-        // Actualiza el estado al cargar
+        // El evento para actualizar el estado al cargar es crucial
         window.addEventListener('pywebviewready', updateUIState);
     </script>
 </body>
