@@ -6,12 +6,19 @@ import http.server
 import socketserver
 import threading
 import serial.tools.list_ports
+import queue 
 
 from communicator import Communicator
 from controller import Controller
 
 PORT = 8000
+ui_queue = queue.Queue()
 window = None
+
+# Creamos una cola dedicada para los reportes de monitoreo
+monitoring_queue = queue.Queue()
+# Una bandera para controlar el hilo de lectura
+monitoring_active = threading.Event()
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -26,77 +33,100 @@ class Api:
         self._communicator = Communicator()
         self._controller = Controller(self._communicator)
 
+    def start_monitoring(self):
+        """Activa el modo monitoreo en el controlador y en el backend."""
+        print("API: Iniciando modo monitoreo...")
+        if not self._communicator.is_connected:
+            return {'status': 'error', 'message': 'Debe estar conectado para monitorear.'}
+
+        # Enviamos el comando para habilitar el monitoreo en el firmware
+        self._communicator.send_command(0x80)
+        
+        # Iniciamos el hilo lector si no está ya corriendo
+        if self._monitoring_thread is None or not self._monitoring_thread.is_alive():
+            monitoring_active.set() # Activamos la bandera
+            self._monitoring_thread = threading.Thread(
+                target=self._background_monitoring_reader,
+                args=(self._communicator.ser,) # Pasamos el objeto serial
+            )
+            self._monitoring_thread.start()
+        return {'status': 'success'}
+    
+    def stop_monitoring(self):
+        """Desactiva el modo monitoreo."""
+        print("API: Deteniendo modo monitoreo...")
+        monitoring_active.clear() # Desactivamos la bandera para detener el hilo
+        
+        # Esperamos un poco a que el hilo termine
+        if self._monitoring_thread and self._monitoring_thread.is_alive():
+            self._monitoring_thread.join(timeout=0.5)
+
+        # Enviamos el comando para deshabilitar el monitoreo en el firmware
+        if self._communicator.is_connected:
+            self._communicator.send_command(0x81)
+        return {'status': 'success'}
+        
     def new_project(self):
-        """
-        Prepara un nuevo proyecto vacío y navega a la pantalla de la app.
-        """
         if not window: return
-        print("API: Creando nuevo proyecto...")
-        # Llama a la nueva función en el controlador para limpiar los datos
         self._controller.reset_project_data()
-        # Navega a la app. El frontend se encargará de mostrar el estado vacío.
         app_url = f'http://localhost:{PORT}/web/html/app.html?action=new'
         window.load_url(app_url)
 
     def open_project_file(self):
-        """
-        Abre un diálogo para seleccionar un archivo .lc4, lo carga en memoria
-        y luego navega a la pantalla de la aplicación.
-        """
         if not window: return
-        print("API: Abriendo diálogo para seleccionar archivo...")
-        
         filepaths = window.create_file_dialog(
-            webview.OPEN_DIALOG,
-            allow_multiple=False,
+            webview.OPEN_DIALOG, allow_multiple=False,
             file_types=("Archivos de Proyecto LC4 (*.lc4)",)
         )
-
         if filepaths:
-            filepath = filepaths[0]
-            print(f"API: Archivo seleccionado: {filepath}. Cargando datos...")
-            # Llama al controlador para que lea y cargue el archivo
-            result = self._controller.load_project_from_file(filepath)
-
+            result = self._controller.load_project_from_file(filepaths[0])
             if result['status'] == 'success':
-                # Si la carga fue exitosa, navegamos a la app con una acción específica
                 app_url = f'http://localhost:{PORT}/web/html/app.html?action=load'
                 window.load_url(app_url)
             else:
-                # Si hubo un error al cargar, se lo mostramos al usuario
                 window.create_alert('Error al Abrir Archivo', result['message'])
-        else:
-            print("API: Selección de archivo cancelada.")
     
     def get_project_data_from_memory(self):
-        """
-        Devuelve el diccionario completo del proyecto que está actualmente en memoria.
-        """
-        print("API: El frontend solicitó los datos del proyecto en memoria.")
-        # Añadimos el estado de conexión para que la UI siempre esté sincronizada
         self._controller.project_data['is_connected'] = self._communicator.is_connected
         return self._controller.project_data
+    def check_capture_result(self):
+        """
+        Permite al frontend preguntar si hay un resultado en la cola.
+        Es una operación segura y no bloqueante.
+        """
+        try:
+            # Intenta obtener un item de la cola SIN esperar.
+            result = ui_queue.get_nowait()
+            print("API: Resultado de captura entregado al frontend.")
+            return result
+        except queue.Empty:
+            # Si la cola está vacía, simplemente devuelve None.
+            return None
 
     def perform_full_capture(self):
         """
-        Realiza la captura completa y, al finalizar, "empuja" el objeto
-        completo del proyecto (incluyendo el estado de conexión) al frontend.
+        Esta función no cambia. Su único trabajo es lanzar la captura en un hilo.
         """
         if not window: return
+        capture_thread = threading.Thread(target=self._background_capture_task)
+        capture_thread.start()
 
-        print("API: Realizando captura de configuración completa...")
+    def _background_capture_task(self):
+        """
+        Esta función ahora es más simple: hace el trabajo y deja el resultado en la cola.
+        Ya no se comunica directamente con la GUI.
+        """
+        print("API (Thread): Realizando captura de configuración completa...")
         self._controller.capture_full_configuration()
 
-        # Obtenemos el diccionario completo del proyecto desde el controlador
         full_project_data = self._controller.project_data
-        
-        # Añadimos el estado de la conexión a este diccionario
         full_project_data['is_connected'] = self._communicator.is_connected
 
-        # Serializamos el objeto completo a JSON y lo enviamos al frontend
         json_data = json.dumps(full_project_data)
-        print(f"API: Empujando datos COMPLETOS al frontend.")
-        window.evaluate_js(f'onCaptureComplete({json_data})')
+        
+        # En lugar de llamar a evaluate_js, ponemos el resultado en nuestro "buzón"
+        ui_queue.put(json_data)
+        print("API (Thread): Datos de captura puestos en la cola para la UI.")
 
     # --- El resto de las funciones de la clase Api no necesitan cambios ---
     def request_capture_and_navigate(self):
@@ -155,20 +185,18 @@ class Api:
             return {'status': 'error', 'message': f'Error interno: {e}'}
 
 
-# El resto del archivo (start_server, if __name__ == '__main__') no necesita cambios.
 def start_server():
     httpd = socketserver.TCPServer(("", PORT), Handler)
     print(f"Iniciando servidor local en http://localhost:{PORT}")
     httpd.serve_forever()
 
 if __name__ == '__main__':
-    server_thread = threading.Thread(target=start_server)
-    server_thread.daemon = True
+    server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
     
     api = Api()
     start_url = f'http://localhost:{PORT}/web/html/welcome.html'
     
+    # El arranque se simplifica: ya no necesitamos el hilo listener.
     window = webview.create_window('Cormar - Controlador Semafórico', start_url, js_api=api, width=880, height=620, resizable=True)
-        
     webview.start(debug=True)

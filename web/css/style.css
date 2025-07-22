@@ -196,3 +196,89 @@ body, html {
         transform: rotate(360deg);
     }
 }
+
+
+/* --- INICIO DE NUEVOS ESTILOS PARA EL EDITOR DE SECUENCIAS --- */
+
+.sequence-controls {
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sequence-controls label {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.sequence-controls select {
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 1em;
+    min-width: 200px;
+}
+
+.timeline-container {
+    display: grid;
+    border-left: 1px solid #ccc;
+    border-top: 1px solid #ccc;
+    background-color: #fff;
+    overflow-x: auto; /* Permite scroll horizontal si hay muchas luces */
+}
+
+/* Estilo para cada celda de la grilla */
+.timeline-cell {
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Estilo para las cabeceras (R1, A1, V1...) */
+.timeline-header {
+    background-color: #e9ecef;
+    font-weight: bold;
+    position: sticky; /* Fija la cabecera al hacer scroll vertical */
+    top: 0;
+}
+
+/* Estilo para el nombre del movimiento */
+.movement-name {
+    font-weight: bold;
+    background-color: #f8f9fa;
+    position: sticky; /* Fija el nombre al hacer scroll horizontal */
+    left: 0;
+}
+
+/* Contenedor para los indicadores de luz */
+.light-indicator-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+/* Círculo base para cada luz */
+.light-indicator {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #e0e0e0; /* Gris para luz apagada */
+    border: 1px solid #bdbdbd;
+}
+
+/* Colores para las luces encendidas */
+.light-indicator.red.on { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
+.light-indicator.amber.on { background-color: #f39c12; box-shadow: 0 0 8px #f39c12; }
+.light-indicator.green.on { background-color: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+
+/* Estilo para la columna de tiempos */
+.movement-times {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: #f8f9fa;
+}
+
+/* --- FIN DE NUEVOS ESTILOS --- */
