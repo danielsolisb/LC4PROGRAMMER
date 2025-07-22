@@ -28,7 +28,36 @@ class Controller:
             'flow_rules': []
         }
 
-    # --- Métodos de Parseo (Existentes y Nuevos) ---
+    def load_project_from_file(self, filepath: str) -> dict:
+        """
+        Lee un archivo de proyecto .lc4 (JSON), valida su contenido y lo carga
+        en la variable self.project_data.
+        """
+        print(f"CONTROLLER: Cargando proyecto desde {filepath}")
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            # Validación básica para asegurar que es un archivo de proyecto válido
+            if 'info' not in data or 'movements' not in data:
+                raise ValueError("El archivo no parece ser un proyecto LC4 válido.")
+            self.project_data = data
+            return {'status': 'success'}
+        except FileNotFoundError:
+            return {'status': 'error', 'message': 'El archivo no fue encontrado.'}
+        except json.JSONDecodeError:
+            return {'status': 'error', 'message': 'El archivo está corrupto o no es un JSON válido.'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+            
+    def reset_project_data(self):
+        """
+        Reinicia el diccionario del proyecto a su estado inicial vacío.
+        """
+        print("CONTROLLER: Reseteando datos del proyecto a estado inicial.")
+        self.project_data = {
+            'info': {}, 'movements': [], 'sequences': [], 'plans': [],
+            'intermittences': [], 'holidays': [], 'flow_rules': []
+        }
 
     def _parse_id_response(self, response: dict) -> str:
         if response.get('status') == 'success' and response.get('data'):

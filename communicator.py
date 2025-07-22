@@ -51,7 +51,7 @@ class Communicator:
                 self.ser.reset_input_buffer()
                 self.ser.write(frame)
                 print(f"Enviado: {frame.hex().upper()}")
-                
+                time.sleep(0.06) 
                 # --- SOLUCIÓN DE LECTURA ROBUSTA ---
                 # Leemos hasta recibir un salto de línea, con un timeout de 1 segundo.
                 # Esto es mucho más fiable que una pausa fija.
@@ -63,6 +63,7 @@ class Communicator:
                     print(f"Respuesta Recibida: {response_text}")
                     return {'status': 'success', 'data': response_text}
                 else:
+                    print(f"ADVERTENCIA: Timeout para el comando 0x{cmd_byte:02X}. No se recibió respuesta.")
                     return {'status': 'error', 'message': 'Timeout: No se recibió respuesta del dispositivo.'}
 
             except serial.SerialException as e:

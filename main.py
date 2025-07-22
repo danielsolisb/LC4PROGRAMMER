@@ -26,7 +26,57 @@ class Api:
         self._communicator = Communicator()
         self._controller = Controller(self._communicator)
 
-    # --- FUNCIÓN MODIFICADA Y EFICIENTE ---
+    def new_project(self):
+        """
+        Prepara un nuevo proyecto vacío y navega a la pantalla de la app.
+        """
+        if not window: return
+        print("API: Creando nuevo proyecto...")
+        # Llama a la nueva función en el controlador para limpiar los datos
+        self._controller.reset_project_data()
+        # Navega a la app. El frontend se encargará de mostrar el estado vacío.
+        app_url = f'http://localhost:{PORT}/web/html/app.html?action=new'
+        window.load_url(app_url)
+
+    def open_project_file(self):
+        """
+        Abre un diálogo para seleccionar un archivo .lc4, lo carga en memoria
+        y luego navega a la pantalla de la aplicación.
+        """
+        if not window: return
+        print("API: Abriendo diálogo para seleccionar archivo...")
+        
+        filepaths = window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=False,
+            file_types=("Archivos de Proyecto LC4 (*.lc4)",)
+        )
+
+        if filepaths:
+            filepath = filepaths[0]
+            print(f"API: Archivo seleccionado: {filepath}. Cargando datos...")
+            # Llama al controlador para que lea y cargue el archivo
+            result = self._controller.load_project_from_file(filepath)
+
+            if result['status'] == 'success':
+                # Si la carga fue exitosa, navegamos a la app con una acción específica
+                app_url = f'http://localhost:{PORT}/web/html/app.html?action=load'
+                window.load_url(app_url)
+            else:
+                # Si hubo un error al cargar, se lo mostramos al usuario
+                window.create_alert('Error al Abrir Archivo', result['message'])
+        else:
+            print("API: Selección de archivo cancelada.")
+    
+    def get_project_data_from_memory(self):
+        """
+        Devuelve el diccionario completo del proyecto que está actualmente en memoria.
+        """
+        print("API: El frontend solicitó los datos del proyecto en memoria.")
+        # Añadimos el estado de conexión para que la UI siempre esté sincronizada
+        self._controller.project_data['is_connected'] = self._communicator.is_connected
+        return self._controller.project_data
+
     def perform_full_capture(self):
         """
         Realiza la captura completa y, al finalizar, "empuja" el objeto

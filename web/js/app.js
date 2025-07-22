@@ -8,10 +8,26 @@ let projectData = {};
 window.addEventListener('pywebviewready', () => {
     console.log("EVENTO: pywebviewready -> La API y el DOM están listos.");
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('action') === 'capture') {
-        runCaptureFlow();
-    } else {
-        runNormalInitialization();
+    const action = urlParams.get('action'); // Puede ser 'capture', 'new', 'open' o null
+
+    // Usamos un switch para manejar los diferentes casos de carga
+    switch (action) {
+        case 'capture':
+            runCaptureFlow();
+            break;
+            
+        case 'load':
+            runLoadFileFlow();
+            break;
+
+        case 'new':
+        case 'open': // 'open' ya no se usa, pero lo dejamos por si acaso
+            runNewProjectFlow();
+            break;
+        
+        default:
+            runNewProjectFlow();
+            break;
     }
 });
 
@@ -35,6 +51,22 @@ function onCaptureComplete(fullProjectData) {
     modal.classList.remove('visible');
 }
 
+async function runLoadFileFlow() {
+    console.log("Cargando datos de proyecto desde el backend (archivo)...");
+    try {
+        // Python ya cargó el archivo, ahora solo pedimos los datos desde la memoria
+        const loadedData = await window.pywebview.api.get_project_data_from_memory();
+        projectData = loadedData;
+        console.log("Datos del archivo cargados en JS:", projectData);
+
+        // Actualizamos el dashboard. Al abrir un archivo, el estado de conexión
+        // puede ser cualquiera, por eso lo leemos del objeto que nos envía Python.
+        updateDashboard(projectData.info, projectData.is_connected); 
+    } catch (e) {
+        console.error("Error al cargar datos del archivo:", e);
+        alert("Ocurrió un error al mostrar los datos del archivo cargado.");
+    }
+}
 
 async function runCaptureFlow() {
     const modal = document.getElementById('loading-modal');
@@ -69,11 +101,16 @@ function updateDashboard(infoData, isConnected) {
 
 // --- El resto de las funciones no necesitan cambios ---
 
-async function runNormalInitialization() {
-    console.log("Inicialización normal: No se realizó captura.");
-    // En un futuro, aquí se podría cargar un archivo de proyecto.
-    // Por ahora, simplemente muestra la UI vacía.
-    updateDashboard({}, false);
+async function runNewProjectFlow() {
+    console.log("Inicialización para un proyecto nuevo.");
+    projectData = {}; 
+    try {
+        const status = await window.pywebview.api.get_connection_status();
+        updateDashboard({}, status.is_connected); 
+    } catch (e) {
+        console.error("Error durante la inicialización de nuevo proyecto:", e);
+        updateDashboard({}, false);
+    }
 }
 
 function updateAppConnectionStatus(isConnected) {

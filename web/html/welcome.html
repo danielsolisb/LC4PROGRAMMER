@@ -34,8 +34,8 @@
     <div class="container">
         <img src="/assets/img/cormar_logo.png" alt="Logo Cormar" class="logo">
         <div class="options-grid">
-            <div id="card-new" class="option-card disabled"><span>Nuevo</span></div>
-            <div id="card-open" class="option-card disabled"><span>Abrir</span></div>
+            <div id="card-new" class="option-card" onclick="handleNewProject()"><span>Nuevo</span></div>
+            <div id="card-open" class="option-card" onclick="handleOpenFile()"><span>Abrir</span></div>
             <div id="card-capture" class="option-card disabled" onclick="handleCapture()"><span>Capturar</span></div>
             <div class="option-card" onclick="openOptionsModal()"><span>Opciones</span></div>
         </div>
@@ -65,6 +65,18 @@
         const comPortSelect = document.getElementById('com-port');
         const baudRateSelect = document.getElementById('baud-rate');
         const captureCard = document.getElementById('card-capture');
+
+        async function handleNewProject() {
+            console.log("JS: Solicitando crear un nuevo proyecto...");
+            // Llama a la nueva función en la API de Python
+            await window.pywebview.api.new_project();
+        }
+
+        async function handleOpenFile() {
+            console.log("JS: Solicitando abrir un archivo de proyecto...");
+            // Llama a la nueva función en la API de Python
+            await window.pywebview.api.open_project_file();
+        }
 
         async function openOptionsModal() {
             try {
@@ -128,6 +140,8 @@
             baudRateSelect.disabled = isConnected;
 
             captureCard.classList.toggle('disabled', !isConnected);
+            document.getElementById('card-new').classList.remove('disabled');
+            document.getElementById('card-open').classList.remove('disabled');
         }
 
         window.addEventListener('pywebviewready', updateUIState);
