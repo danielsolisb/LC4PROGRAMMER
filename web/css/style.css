@@ -275,10 +275,130 @@ body, html {
 .light-indicator.amber.on { background-color: #f39c12; box-shadow: 0 0 8px #f39c12; }
 .light-indicator.green.on { background-color: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
 
-/* Estilo para la columna de tiempos */
-.movement-times {
-    font-family: 'Courier New', Courier, monospace;
+/* Contenedor principal de la vista de monitoreo */
+.monitoring-wrapper {
+    background-color: #ffffff;
+    padding: 30px; /* Más padding interno */
+    border-radius: 12px; /* Bordes más redondeados */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    
+    /* --- La Magia para el Tamaño y Centrado --- */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centra la tabla de luces verticalmente */
+    /* Ocupa todo el espacio vertical disponible menos un margen */
+    height: calc(100vh - 160px); 
+}
+
+/* Hacemos que la tabla de luces ocupe el espacio necesario, sin bordes extra */
+#monitoring-display.timeline-container {
+    border: none;
+    overflow-x: auto; /* Mantenemos el scroll horizontal si es necesario */
+    overflow-y: hidden; /* Eliminamos el scroll vertical */
+}
+
+/* Aumentamos la altura de las celdas para dar más aire */
+#monitoring-display .timeline-cell {
+    padding-top: 25px;
+    padding-bottom: 25px;
+}
+
+/* Hacemos las luces y las cabeceras más grandes y claras */
+#monitoring-display .timeline-header {
+    font-size: 1.2em;
+    color: #495057;
+}
+
+#monitoring-display .light-indicator {
+    width: 36px;
+    height: 36px;
+}
+
+/* --- FIN DE NUEVOS ESTILOS --- */
+
+/* --- INICIO DE NUEVOS ESTILOS PARA EL PROGRAMADOR DE PLANES --- */
+
+.plan-schedule-container {
+    display: grid;
+    grid-template-columns: 80px repeat(8, 1fr);
+    /* Reducimos la altura de las filas para un horario más compacto */
+    grid-template-rows: 40px repeat(24, 45px); /* Cabecera + 24 horas de 45px */
+    border: 1px solid #dee2e6;
+    background-color: #fff;
+    /* Reducimos la altura total y garantizamos el scroll */
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+    position: relative; /* Esencial para el posicionamiento absoluto de las tarjetas */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+
+.schedule-cell {
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    padding: 5px;
+    font-size: 0.9em;
+}
+
+.schedule-header {
     background-color: #f8f9fa;
+    font-weight: bold;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 10px 5px;
+    height: 40px; /* Coincide con la altura de la fila de la cabecera */
+}
+
+.time-slot {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    text-align: right;
+    padding-right: 10px;
+    font-size: 0.8em;
+    color: #6c757d;
+    position: sticky;
+    left: 0;
+}
+
+/* Estilo para las tarjetas de los planes */
+.plan-card {
+    position: absolute; /* Usaremos posicionamiento absoluto preciso */
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    border-left: 4px solid rgba(0,0,0,0.3);
+    overflow: hidden;
+    z-index: 5;
+    transition: all 0.2s ease;
+    box-sizing: border-box; /* Asegura que el padding no afecte el tamaño */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+
+.plan-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 6;
+}
+
+.plan-card-title {
+    display: block;
+    font-size: 1.1em;
+    margin-bottom: 2px;
+}
+
+.plan-card-details {
+    display: block;
+    font-size: 0.9em;
+    opacity: 0.9;
 }
 
 /* --- FIN DE NUEVOS ESTILOS --- */

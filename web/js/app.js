@@ -1,7 +1,7 @@
 // web/js/app.js
 
-// --- 1. Variables Globales y Constantes ---
 let projectData = {};
+let monitoringPoller = null;
 
 const LIGHT_MAP = {
     // Puerto D
@@ -17,15 +17,34 @@ const LIGHT_MAP = {
     'A7': { port: 'portF', bit: 4 }, 'V7': { port: 'portF', bit: 3 }, 'R8': { port: 'portF', bit: 2 },
     'A8': { port: 'portF', bit: 1 }, 'V8': { port: 'portF', bit: 0 },
 };
-
-// La lista ordenada de luces no cambia, sigue siendo nuestra guía para la UI.
 const LIGHT_ORDER = [
     'R1','A1','V1','R2','A2','V2','R3','A3','V3','R4','A4','V4',
     'R5','A5','V5','R6','A6','V6','R7','A7','V7','R8','A8','V8'
 ];
-
-
 // --- 2. Definición de Todas las Funciones Ayudantes y de UI ---
+const DAY_TYPE_MAP = {
+    0: [0], // Domingo
+    1: [1], // Lunes
+    2: [2], // Martes
+    3: [3], // Miércoles
+    4: [4], // Jueves
+    5: [5], // Viernes
+    6: [6], // Sábado
+    7: [1, 2, 3, 4, 5, 6, 0], // Todos los días
+    8: [1, 2, 3, 4, 5, 6],    // Todos menos Domingo
+    9: [6, 0],                // Sábado y Domingo
+    10: [1, 2, 3, 4, 5],       // Todos excepto Sábado y Domingo
+    11: [5, 6, 0],            // Viernes, Sábado y Domingo
+    12: [1, 2, 3, 4],          // Todos menos Vie, Sáb, Dom
+    13: [5, 6],                // Viernes y Sábado
+    14: [7]                    // Feriados (usaremos la columna 8, índice 7)
+};
+
+// Paleta de colores profesional para asignar a los planes
+const PLAN_COLORS = [
+    '#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6',
+    '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
+];
 
 function updateAppConnectionStatus(isConnected) {
     const statusIndicator = document.getElementById('app-status-indicator');
@@ -133,10 +152,14 @@ async function goBackToWelcome() {
 // --- 3. Lógica Principal de Carga de Vistas ---
 
 async function loadView(viewName, forceReload = false) {
-    const mainContent = document.getElementById('main-content-area');
-    if (mainContent.dataset.currentView === viewName && !forceReload) {
-        return;
+    if (monitoringPoller && viewName !== 'monitoring') {
+        console.log("Saliendo de la vista de monitoreo. Deteniendo poller y comando.");
+        clearInterval(monitoringPoller);
+        monitoringPoller = null;
+        await window.pywebview.api.stop_monitoring();
     }
+    const mainContent = document.getElementById('main-content-area');
+    if (mainContent.dataset.currentView === viewName && !forceReload) return;
     try {
         const response = await fetch(`/web/html/views/${viewName}.html`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -155,6 +178,11 @@ async function loadView(viewName, forceReload = false) {
                 document.getElementById('sequence-selector').value = projectData.sequences[0].id;
                 displaySelectedSequence();
             }
+        } else if (viewName === 'monitoring') {
+            initializeMonitoringView();
+        } else if (viewName === 'plans') {
+            // --- NUEVA LLAMADA ---
+            initializePlanEditor();
         }
     } catch (error) {
         console.error("Error al cargar la vista:", error);
@@ -162,6 +190,175 @@ async function loadView(viewName, forceReload = false) {
     }
 }
 
+/**
+ * Obtiene un color consistente para un ID de plan.
+ * @param {number} planId - El ID del plan.
+ * @returns {string} Un color hexadecimal.
+ */
+function getPlanColor(planId) {
+    return PLAN_COLORS[planId % PLAN_COLORS.length];
+}
+
+function initializePlanEditor() {
+    const container = document.getElementById('plan-schedule-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // 1. Crear la estructura de la grilla (esto no cambia)
+    const days = ['Hora', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo', 'Feriados'];
+    days.forEach(day => container.insertAdjacentHTML('beforeend', `<div class="schedule-cell schedule-header">${day}</div>`));
+    for (let hour = 0; hour < 24; hour++) {
+        const timeStr = hour.toString().padStart(2, '0') + ':00';
+        container.insertAdjacentHTML('beforeend', `<div class="schedule-cell time-slot">${timeStr}</div>`);
+        for (let i = 0; i < 8; i++) {
+            container.insertAdjacentHTML('beforeend', `<div class="schedule-cell"></div>`);
+        }
+    }
+
+    if (!projectData || !projectData.plans || projectData.plans.length === 0) return;
+
+    // 2. Procesar los planes en una estructura diaria (esto no cambia)
+    const weeklySchedule = {};
+    for (let i = 0; i < 8; i++) { weeklySchedule[i] = []; }
+    projectData.plans.forEach(plan => {
+        const applicableDays = DAY_TYPE_MAP[plan.day_type_id];
+        if (applicableDays) {
+            applicableDays.forEach(dayIndex => {
+                weeklySchedule[dayIndex].push({ ...plan, startTime: plan.hour * 60 + plan.minute });
+            });
+        }
+    });
+    for (let day in weeklySchedule) {
+        weeklySchedule[day].sort((a, b) => a.startTime - b.startTime);
+    }
+
+    // 3. Calcular los bloques de tiempo y dibujarlos
+    for (let dayIndex = 0; dayIndex < 8; dayIndex++) { // 0=Dom, 1=Lun, ..., 7=Feriados
+        const plansForToday = weeklySchedule[dayIndex];
+        
+        // Determinar el día anterior para la herencia de planes
+        const yesterdayIndex = (dayIndex === 1) ? 0 : (dayIndex === 0) ? 6 : dayIndex - 1; // Lunes hereda de Domingo, Domingo de Sábado
+        const plansFromYesterday = weeklySchedule[yesterdayIndex];
+        const lastPlanFromYesterday = plansFromYesterday.length > 0 ? plansFromYesterday[plansFromYesterday.length - 1] : null;
+
+        // Dibujar el plan heredado desde las 00:00 hasta el primer plan de hoy
+        if (lastPlanFromYesterday) {
+            const firstPlanStartTime = plansForToday.length > 0 ? plansForToday[0].startTime : 24 * 60;
+            if (firstPlanStartTime > 0) {
+                drawPlanCard(lastPlanFromYesterday, dayIndex, 0, firstPlanStartTime);
+            }
+        }
+
+        // Dibujar los planes del día actual
+        for (let i = 0; i < plansForToday.length; i++) {
+            const currentPlan = plansForToday[i];
+            const nextPlanStartTime = (i + 1 < plansForToday.length) ? plansForToday[i + 1].startTime : 24 * 60;
+            drawPlanCard(currentPlan, dayIndex, currentPlan.startTime, nextPlanStartTime);
+        }
+    }
+}
+/**
+ * Dibuja una tarjeta de plan en la grilla con la duración calculada.
+ * @param {object} plan - El objeto del plan.
+ * @param {number} dayIndex - El índice del día (0=Dom, 1=Lun...).
+ * @param {number} startTimeInMinutes - Minuto de inicio del bloque.
+ * @param {number} endTimeInMinutes - Minuto de fin del bloque.
+ */
+function drawPlanCard(plan, dayIndex, startTimeInMinutes, endTimeInMinutes) {
+    const container = document.getElementById('plan-schedule-container');
+    const durationInMinutes = endTimeInMinutes - startTimeInMinutes;
+    if (durationInMinutes <= 0) return;
+
+    const color = getPlanColor(plan.id);
+    // Mapeo de día a la columna de la grilla (1-8)
+    const dayMap = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7, 7: 8 };
+    const column = dayMap[dayIndex];
+
+    const card = document.createElement('div');
+    card.className = 'plan-card';
+    card.style.backgroundColor = color;
+    
+    // --- Lógica de Posicionamiento Preciso en Píxeles ---
+    const headerHeight = 40;  // Altura de la cabecera en px (de CSS)
+    const hourRowHeight = 45; // Altura de cada fila de hora en px (de CSS)
+    
+    // Calculamos la posición 'top' basada en la hora y minuto de inicio
+    const topPosition = headerHeight + (startTimeInMinutes / 60) * hourRowHeight;
+    // Calculamos la altura de la tarjeta basada en su duración en minutos
+    const cardHeight = (durationInMinutes / 60) * hourRowHeight;
+
+    card.style.position = 'absolute';
+    card.style.top = `${topPosition}px`;
+    card.style.height = `${cardHeight - 2}px`; // -2px para un pequeño margen visual
+
+    // El posicionamiento horizontal sigue siendo porcentual
+    const columnWidthPercent = 100 / 9;
+    card.style.left = `${(column) * columnWidthPercent}%`; // +1 para saltar la columna de hora
+    card.style.width = `calc(${columnWidthPercent}% - 4px)`; // -4px para margen
+
+    card.innerHTML = `
+        <span class="plan-card-title">Plan #${plan.id}</span>
+        <span class="plan-card-details">Sec: ${plan.sequence_id}</span>
+    `;
+    const startHour = String(plan.hour).padStart(2,'0');
+    const startMinute = String(plan.minute).padStart(2,'0');
+    card.title = `Plan #${plan.id} - Sec: ${plan.sequence_id} | Inicia: ${startHour}:${startMinute}`;
+    
+    // Añadimos la tarjeta directamente al contenedor principal
+    container.appendChild(card);
+}
+
+async function initializeMonitoringView() {
+    const display = document.getElementById('monitoring-display');
+    if (!display) return;
+
+    display.innerHTML = ''; // Limpiar la vista anterior
+
+    // 1. Reutilizamos la clase para un aspecto coherente
+    display.className = 'timeline-container'; 
+    // --- CAMBIO CLAVE: Se elimina la columna 'auto' del principio ---
+    display.style.gridTemplateColumns = `repeat(${LIGHT_ORDER.length}, 1fr)`;
+
+    // 2. Creamos la FILA DE CABECERA (sin la celda "Estado")
+    LIGHT_ORDER.forEach(lightName => {
+        display.insertAdjacentHTML('beforeend', `<div class="timeline-cell timeline-header">${lightName}</div>`);
+    });
+
+    // 3. Creamos la FILA DE DATOS (sin la celda "Real")
+    LIGHT_ORDER.forEach(lightName => {
+        const colorClass = lightName.startsWith('R') ? 'red' : lightName.startsWith('A') ? 'amber' : 'green';
+        display.insertAdjacentHTML('beforeend', `
+            <div class="timeline-cell light-indicator-container">
+                <div id="monitor-light-${lightName}" class="light-indicator ${colorClass}"></div>
+            </div>
+        `);
+    });
+
+    // 4. El resto de la lógica para iniciar el monitoreo no cambia
+    await window.pywebview.api.start_monitoring();
+
+    if (monitoringPoller) clearInterval(monitoringPoller);
+    monitoringPoller = setInterval(async () => {
+        const updateJson = await window.pywebview.api.check_monitoring_update();
+        if (updateJson) {
+            const portData = JSON.parse(updateJson);
+            updateMonitoringLights(portData);
+        }
+    }, 200);
+}
+
+function updateMonitoringLights(portData) {
+    LIGHT_ORDER.forEach(lightName => {
+        const lightElement = document.getElementById(`monitor-light-${lightName}`);
+        if (!lightElement) return;
+
+        const lightInfo = LIGHT_MAP[lightName];
+        const portValue = parseInt(portData[lightInfo.port], 16);
+        const isLightOn = (portValue & (1 << lightInfo.bit)) !== 0;
+
+        lightElement.classList.toggle('on', isLightOn);
+    });
+}
 
 // --- 4. Lógica de Flujo de Datos y Eventos ---
 

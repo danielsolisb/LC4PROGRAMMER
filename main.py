@@ -7,6 +7,7 @@ import socketserver
 import threading
 import serial.tools.list_ports
 import queue 
+import time
 
 from communicator import Communicator
 from controller import Controller
@@ -32,6 +33,7 @@ class Api:
     def __init__(self):
         self._communicator = Communicator()
         self._controller = Controller(self._communicator)
+        self._monitoring_thread = None
 
     def start_monitoring(self):
         """Activa el modo monitoreo en el controlador y en el backend."""
@@ -65,7 +67,41 @@ class Api:
         if self._communicator.is_connected:
             self._communicator.send_command(0x81)
         return {'status': 'success'}
-        
+    
+    def _background_monitoring_reader(self, ser_instance):
+        """
+        Corre en un hilo, lee continuamente el puerto serial buscando
+        tramas de monitoreo (CMD 0x82) y las pone en la cola.
+        """
+        while monitoring_active.is_set():
+            try:
+                # Buscamos el inicio de una trama
+                if ser_instance.read(1) == b'\x43':
+                    if ser_instance.read(2) == b'\x53\x4F': # STX encontrado
+                        cmd = ser_instance.read(1)
+                        if cmd == b'\x82': # Es un reporte de monitoreo
+                            length_byte = ser_instance.read(1)
+                            length = int.from_bytes(length_byte, 'big')
+                            payload = ser_instance.read(length)
+                            # Leemos checksum y ETX para limpiar el buffer
+                            ser_instance.read(3) 
+                            
+                            # Parseamos el payload y lo ponemos en la cola
+                            parsed_data = self._controller.parse_monitoring_report(payload)
+                            if parsed_data:
+                                monitoring_queue.put(json.dumps(parsed_data))
+            except (serial.SerialException, TypeError):
+                print("Error en el hilo de monitoreo, cerrando.")
+                monitoring_active.clear()
+            time.sleep(0.01) # Pequeña pausa para no saturar la CPU
+
+    def check_monitoring_update(self):
+        """Permite al frontend preguntar si hay un nuevo reporte en la cola."""
+        try:
+            return monitoring_queue.get_nowait()
+        except queue.Empty:
+            return None
+
     def new_project(self):
         if not window: return
         self._controller.reset_project_data()

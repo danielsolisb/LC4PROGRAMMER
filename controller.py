@@ -28,6 +28,29 @@ class Controller:
             'flow_rules': []
         }
 
+    def parse_monitoring_report(self, payload: bytes) -> dict | None:
+        """
+        Parsea el payload de una trama de reporte de monitoreo (CMD 0x82).
+        Payload: [ID_Controlador, PortD, PortE, PortF, Estado_Peatonal]
+        """
+        if len(payload) != 5:
+            return None
+        
+        # Extraemos los valores de los puertos como cadenas hexadecimales
+        port_d_hex = f"{payload[1]:02X}"
+        port_e_hex = f"{payload[2]:02X}"
+        port_f_hex = f"{payload[3]:02X}"
+        
+        # Devolvemos un diccionario con el mismo formato que un 'movimiento'
+        # para poder reutilizar la lógica de visualización del frontend.
+        return {
+            'portD': port_d_hex,
+            'portE': port_e_hex,
+            'portF': port_f_hex,
+            'portH': "00", # No vienen en el reporte, asumimos 0
+            'portJ': "00"  # No vienen en el reporte, asumimos 0
+        }
+        
     def load_project_from_file(self, filepath: str) -> dict:
         """
         Lee un archivo de proyecto .lc4 (JSON), valida su contenido y lo carga
@@ -48,7 +71,7 @@ class Controller:
             return {'status': 'error', 'message': 'El archivo está corrupto o no es un JSON válido.'}
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
-            
+
     def reset_project_data(self):
         """
         Reinicia el diccionario del proyecto a su estado inicial vacío.
