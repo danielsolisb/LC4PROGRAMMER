@@ -1,0 +1,140 @@
+/* web/css/plan-visualizer.css */
+
+/* --- Contenedores Principales --- */
+.visualizer-container {
+    display: flex;
+    height: calc(100vh - 120px);
+    gap: 20px;
+}
+
+.visualizer-legend {
+    flex: 0 0 220px;
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+}
+
+.visualizer-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Clave para que el contenido se ajuste y no se desborde */
+}
+
+/* --- Pestañas y Detalles del Plan (sin cambios) --- */
+.plan-tabs { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 10px; }
+.plan-tab { padding: 8px 15px; border: 1px solid #ccc; background-color: #f0f0f0; cursor: pointer; border-radius: 5px 5px 0 0; border-bottom: none; }
+.plan-tab:hover { background-color: #e0e0e0; }
+.plan-tab.active { background-color: #3498db; color: white; border-color: #3498db; }
+.plan-details { background-color: #ecf0f1; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+.plan-details p { margin: 5px 0; font-size: 0.95em; }
+
+/* --- Leyenda (sin cambios) --- */
+.visualizer-legend h4 { margin-top: 0; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+.visualizer-legend h5 { margin-top: 15px; margin-bottom: 10px; color: #34495e; }
+.visualizer-legend p { font-size: 0.9em; margin: 4px 0; }
+.legend-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.9em; }
+.color-box { width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc; }
+.color-box.green { background-color: #2ecc71; }
+.color-box.amber { background-color: #f39c12; }
+.color-box.red { background-color: #e74c3c; }
+.color-box.gray { background-color: #bdc3c7; }
+.color-box.violet { background-color: #9b59b6; }
+.color-box.intermittent { background-color: #f39c12; animation: flash-effect 1s step-end infinite; }
+
+/* --- Contenedor de la Línea de Tiempo con Scroll --- */
+.timeline-wrapper {
+    flex-grow: 1;
+    overflow-x: auto; /* Scroll solo si es estrictamente necesario */
+    border: 1px solid #999;
+    background-color: #fff;
+    padding: 5px; /* Pequeño padding interno */
+}
+
+/* --- Rejilla Principal (Grid) --- */
+.timeline-grid-container {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    /* ELIMINADO: min-width. Ahora se ajustará al contenedor. */
+    position: relative;
+}
+
+/* Área de fondo con la rejilla vertical */
+.timeline-bars-area {
+    grid-column: 2 / 3;
+    grid-row: 1 / -1;
+    position: relative;
+    background-size: 100% 100%;
+}
+
+/* Celdas de la rejilla */
+.grid-cell { min-height: 25px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; }
+.grid-cell.header { height: 35px; font-size: 0.8em; font-weight: bold; border-bottom: 1px solid #333; position: sticky; top: 0; background-color: #f8f9fa; z-index: 2; }
+.grid-label { grid-column: 1 / 2; font-weight: bold; text-align: center; border-right: 1px solid #999; position: sticky; left: 0; background-color: #f8f9fa; z-index: 3; }
+
+/* Contenedores de contenido */
+.timeline-ruler-content, .timeline-stages-content, .timeline-bar-container { grid-column: 2 / 3; position: relative; width: 100%; height: 100%; }
+
+/* Regla de tiempo */
+.timeline-ruler-content { align-items: flex-end; }
+.ruler-tick { position: absolute; bottom: 0; width: 1px; background-color: #888; }
+.ruler-tick.minor { height: 5px; }
+.ruler-tick.major { height: 10px; background-color: #000; }
+.ruler-label { position: absolute; top: 2px; transform: translateX(-50%); font-size: 0.75em; }
+
+/* Etiquetas de Etapa/Movimiento */
+.timeline-stages-content { border-bottom: 1px solid #333; }
+.stage-label { position: absolute; bottom: 2px; font-weight: bold; font-size: 0.8em; padding: 1px 3px; transform: translateX(-50%); }
+.stage-separator { position: absolute; top: 0; height: 100%; width: 1px; border-left: 1px dashed #aaa; }
+
+/* Barras de tiempo */
+.timeline-bar-container { display: flex; }
+.timeline-segment {
+    height: 18px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.8em;
+    color: white;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+    overflow: hidden;
+    box-sizing: border-box;
+    border-right: 1px solid rgba(0,0,0,0.2);
+}
+
+.timeline-segment.red { background-color: #e74c3c; }
+.timeline-segment.amber { background-color: #f39c12; }
+.timeline-segment.green { background-color: #2ecc71; }
+.timeline-segment.gray { background-color: #bdc3c7; color: #555; text-shadow: none;}
+.timeline-segment.violet { background-color: #9b59b6; }
+
+/* --- NUEVO: Estilos para Indicadores de Conflicto --- */
+.conflict-indicator-container {
+    display: flex;
+    gap: 3px; /* Espacio entre los puntos de luz */
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.conflict-light-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.5);
+}
+.conflict-light-dot.red { background-color: #e74c3c; }
+.conflict-light-dot.amber { background-color: #f39c12; }
+.conflict-light-dot.green { background-color: #2ecc71; }
+
+
+/* --- Animación de Intermitencia Unificada --- */
+@keyframes flash-effect {
+    50% { opacity: 0.2; }
+}
+.timeline-segment.intermittent {
+    animation: flash-effect 1s step-end infinite;
+}

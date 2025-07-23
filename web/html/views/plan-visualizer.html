@@ -1,0 +1,32 @@
+<!-- web/html/views/plan-visualizer.html -->
+
+<!-- NUEVA LÍNEA: Enlace a la hoja de estilos dedicada -->
+<link rel="stylesheet" href="/web/css/plan-visualizer.css">
+
+<div class="main-header">
+    <h2>Visualizador de Planes</h2>
+</div>
+
+<div class="visualizer-container">
+    <!-- La barra lateral para la leyenda -->
+    <aside class="visualizer-legend">
+        <h4>Leyenda</h4>
+        <div id="legend-content"></div>
+    </aside>
+
+    <!-- El área principal para el contenido -->
+    <main class="visualizer-main">
+        <!-- Contenedor para las pestañas de los planes -->
+        <div id="plan-tabs-container" class="plan-tabs"></div>
+
+        <!-- Contenedor para la información detallada del plan seleccionado -->
+        <div id="plan-details-container" class="plan-details"></div>
+
+        <!-- Contenedor unificado para toda la línea de tiempo -->
+        <div class="timeline-wrapper">
+            <div id="timeline-grid-container" class="timeline-grid-container">
+                <!-- La rejilla, regla y barras se generarán aquí con JavaScript -->
+            </div>
+        </div>
+    </main>
+</div>

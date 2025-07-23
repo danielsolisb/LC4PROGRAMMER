@@ -7,6 +7,7 @@ import { initializeDashboardView } from './views/dashboard.js';
 import { initializeSequencesView } from './views/sequences.js';
 import { initializePlansView } from './views/plans.js';
 import { initializeMonitoringView, cleanupMonitoringView } from './views/monitoring.js';
+import { initializePlanVisualizerView } from './views/plan-visualizer.js';
 
 /**
  * Carga el contenido de una vista (HTML) en el área principal y luego
@@ -48,6 +49,9 @@ async function loadView(viewName, forceReload = false) {
                 break;
             case 'monitoring':
                 initializeMonitoringView();
+                break;
+            case 'plan-visualizer':
+                initializePlanVisualizerView();
                 break;
         }
     } catch (error) {
