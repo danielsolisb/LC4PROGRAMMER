@@ -138,3 +138,57 @@
 .timeline-segment.intermittent {
     animation: flash-effect 1s step-end infinite;
 }
+
+/* ===================================================================== */
+/* --- NUEVO: Estilos para las Tablas de Información Inferiores --- */
+/* ===================================================================== */
+
+.info-tables-container {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    flex-grow: 1; /* Ocupa el espacio restante */
+    overflow-y: auto; /* Scroll si el contenido es muy largo */
+}
+
+.info-table-wrapper {
+    flex: 1; /* Cada tabla ocupa la mitad del espacio */
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    min-width: 0;
+}
+
+.info-table-wrapper h5 {
+    margin-top: 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ccc;
+    font-size: 1em;
+    color: #34495e;
+}
+
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+}
+
+.info-table th, .info-table td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.info-table th {
+    font-weight: bold;
+}
+
+.info-table tr:last-child td {
+    border-bottom: none;
+}
+
+.info-table .light-list {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+}

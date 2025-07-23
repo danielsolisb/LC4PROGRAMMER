@@ -1,7 +1,7 @@
 // web/js/views/plan-visualizer.js
 
 import { getProjectData } from '../store.js';
-import { LIGHT_MAP } from '../constants.js';
+import { LIGHT_MAP, LIGHT_ORDER } from '../constants.js';
 
 // --- Constantes y Mapeos (sin cambios) ---
 const DAY_TYPE_LEGEND = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Todos los días', 8: 'Todos los días menos Domingos', 9: 'Sábado y Domingo', 10: 'Todos excepto Sábado y Domingo', 11: 'Viernes, Sábado y Domingo', 12: 'Todos menos Vie, Sáb, Dom', 13: 'Viernes y Sábado', 14: 'Feriados' };
@@ -48,6 +48,20 @@ function getGroupStatus(movement, groupNumber) {
     return status;
 }
 
+// --- NUEVA FUNCIÓN: Obtiene una lista de todas las luces encendidas en un movimiento ---
+function getActiveLightsForMovement(movement) {
+    const activeLights = [];
+    LIGHT_ORDER.forEach(lightName => {
+        const lightInfo = LIGHT_MAP[lightName];
+        const portValue = parseInt(movement[lightInfo.port], 16);
+        if ((portValue & (1 << lightInfo.bit)) !== 0) {
+            activeLights.push(lightName);
+        }
+    });
+    return activeLights.join(' ');
+}
+
+
 /**
  * Dibuja los detalles y la línea de tiempo para un plan específico.
  * @param {number} planId - El ID del plan a renderizar.
@@ -55,7 +69,9 @@ function getGroupStatus(movement, groupNumber) {
 function renderPlanDetails(planId) {
     const projectData = getProjectData();
     const gridContainer = document.getElementById('timeline-grid-container');
+    const infoTablesContainer = document.getElementById('info-tables-container');
     gridContainer.innerHTML = '';
+    infoTablesContainer.innerHTML = '';
 
     const plan = projectData.plans.find(p => p.id === planId);
     if (!plan) return;
@@ -73,8 +89,7 @@ function renderPlanDetails(planId) {
 
     const intermittenceRule = projectData.intermittences.find(i => i.plan_id === plan.id);
 
-    // --- LÓGICA DE RENDERIZADO FINAL ---
-
+    // --- RENDERIZADO DE LA LÍNEA DE TIEMPO (sin cambios) ---
     const barsArea = document.createElement('div');
     barsArea.className = 'timeline-bars-area';
     const majorTickInterval = totalCycleTime > 100 ? 10 : 5;
@@ -129,14 +144,11 @@ function renderPlanDetails(planId) {
         cycleMovements.forEach(mov => {
             const duration = mov.times[plan.time_sel] || 0;
             if (duration === 0) return;
-
             const status = getGroupStatus(mov, i);
             const activeLightsCount = Object.values(status).filter(Boolean).length;
-            
             let colorClass = 'gray';
             const segment = document.createElement('div');
             segment.className = 'timeline-segment';
-
             if (activeLightsCount === 1) {
                 if (status.red) colorClass = 'red';
                 else if (status.amber) colorClass = 'amber';
@@ -144,8 +156,6 @@ function renderPlanDetails(planId) {
                 segment.textContent = duration > 3 ? duration : '';
             } else if (activeLightsCount > 1) {
                 colorClass = 'violet';
-                // --- CAMBIO CLAVE: Lógica para mostrar indicadores de conflicto ---
-                segment.textContent = ''; // Limpiar cualquier texto
                 const conflictContainer = document.createElement('div');
                 conflictContainer.className = 'conflict-indicator-container';
                 if (status.red) conflictContainer.appendChild(Object.assign(document.createElement('span'), { className: 'conflict-light-dot red' }));
@@ -153,14 +163,11 @@ function renderPlanDetails(planId) {
                 if (status.green) conflictContainer.appendChild(Object.assign(document.createElement('span'), { className: 'conflict-light-dot green' }));
                 segment.appendChild(conflictContainer);
             } else {
-                // Estado apagado
                 segment.textContent = duration > 3 ? duration : '';
             }
-            
             segment.classList.add(colorClass);
             segment.style.width = `${(duration / totalCycleTime) * 100}%`;
             segment.title = `Grupo ${i}, Movimiento ${mov.id}\nDuración: ${duration}s`;
-
             if (intermittenceRule && colorClass !== 'gray' && colorClass !== 'violet') {
                  const groupLights = GROUP_LIGHTS[i];
                  const lightForCheck = groupLights.find(l => (l.startsWith('R') && status.red) || (l.startsWith('A') && status.amber) || (l.startsWith('V') && status.green));
@@ -179,6 +186,48 @@ function renderPlanDetails(planId) {
         });
         gridContainer.appendChild(barContainerCell);
     }
+    
+    // --- NUEVO: RENDERIZADO DE LAS TABLAS DE INFORMACIÓN ---
+    
+    // 1. Tabla de Detalles de Movimientos
+    let movementsTableHTML = `
+        <div class="info-table-wrapper">
+            <h5>Detalle de Movimientos</h5>
+            <table class="info-table">
+                <thead><tr><th>Movimiento</th><th>Luces Activas</th><th>Tiempo (s)</th></tr></thead>
+                <tbody>`;
+    cycleMovements.forEach(mov => {
+        const duration = mov.times[plan.time_sel] || 0;
+        const activeLights = getActiveLightsForMovement(mov);
+        movementsTableHTML += `<tr><td>${mov.id}</td><td class="light-list">${activeLights}</td><td>${duration}</td></tr>`;
+    });
+    movementsTableHTML += `</tbody></table></div>`;
+
+    // 2. Tabla de Verdes Efectivos
+    let greensTableHTML = `
+        <div class="info-table-wrapper">
+            <h5>Verdes Efectivos</h5>
+            <table class="info-table">
+                <thead><tr><th>#</th><th>Movimiento</th><th>Grupos con Verde</th><th>Tiempo (s)</th></tr></thead>
+                <tbody>`;
+    let effectiveGreenCounter = 0;
+    cycleMovements.forEach(mov => {
+        const duration = mov.times[plan.time_sel] || 0;
+        const greenGroups = [];
+        for (let i = 1; i <= 8; i++) {
+            const status = getGroupStatus(mov, i);
+            if (status.green && !status.red && !status.amber) {
+                greenGroups.push(`G${i}`);
+            }
+        }
+        if (greenGroups.length > 0) {
+            effectiveGreenCounter++;
+            greensTableHTML += `<tr><td>Verde Efectivo ${effectiveGreenCounter}</td><td>${mov.id}</td><td>${greenGroups.join(', ')}</td><td>${duration}</td></tr>`;
+        }
+    });
+    greensTableHTML += `</tbody></table></div>`;
+    
+    infoTablesContainer.innerHTML = movementsTableHTML + greensTableHTML;
 }
 
 // --- Función de Inicialización Principal ---
