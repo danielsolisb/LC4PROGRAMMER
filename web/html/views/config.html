@@ -1,0 +1,75 @@
+<!-- web/html/views/config.html -->
+
+<!-- La hoja de estilos dedicada se mantiene -->
+<link rel="stylesheet" href="/web/css/config.css">
+
+<!-- ELIMINADO: El <link> a leaflet.css fue removido de aquí -->
+
+<div class="main-header">
+    <h2>Configuración del Controlador</h2>
+</div>
+
+<!-- Contenedor de Pestañas -->
+<div class="config-tabs">
+    <button class="config-tab active" data-tab="tab-intersection">1. Diseño de Intersección</button>
+    <button class="config-tab" data-tab="tab-sequences">2. Lógica de Secuencias</button>
+    <button class="config-tab" data-tab="tab-scheduling">3. Programación y Agenda</button>
+</div>
+
+<!-- Contenido de las Pestañas -->
+<div class="config-content">
+    <!-- PESTAÑA 1: DISEÑO DE INTERSECCIÓN -->
+    <div id="tab-intersection" class="config-tab-content active">
+        <div class="intersection-layout">
+            
+            <!-- Columna Izquierda: Propiedades y Matriz -->
+            <div class="intersection-sidebar">
+                <div class="config-panel">
+                    <h5>Propiedades Generales</h5>
+                    <div id="general-properties-form">
+                        <!-- El formulario se generará aquí -->
+                    </div>
+                </div>
+                <div class="config-panel">
+                    <h5>Agenda de Feriados</h5>
+                    <div id="holidays-editor">
+                        <!-- El editor de feriados se generará aquí -->
+                    </div>
+                </div>
+                <div class="config-panel">
+                    <h5>Matriz de Conflictos</h5>
+                    <div id="conflict-matrix-container">
+                        <!-- La matriz se generará aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Mapa y Herramientas -->
+            <div class="intersection-main">
+                <div class="map-toolbar">
+                    <h6>Herramientas del Mapa</h6>
+                    <button class="tool-btn" data-type="group">Añadir Grupo Semafórico</button>
+                    <button class="tool-btn" data-type="pedestrian">Añadir Semáforo Peatonal</button>
+                    <button class="tool-btn" data-type="demand">Añadir Botón de Demanda</button>
+                    <button class="tool-btn" data-type="direction">Añadir Sentido de Vía</button>
+                </div>
+                <div id="map-container">
+                    <div id="config-map"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PESTAÑA 2: LÓGICA DE SECUENCIAS (Contenido futuro) -->
+    <div id="tab-sequences" class="config-tab-content">
+        <p>Contenido para la Lógica de Secuencias irá aquí.</p>
+    </div>
+
+    <!-- PESTAÑA 3: PROGRAMACIÓN Y AGENDA (Contenido futuro) -->
+    <div id="tab-scheduling" class="config-tab-content">
+        <p>Contenido para la Programación y Agenda irá aquí.</p>
+    </div>
+</div>
+
+<!-- ELIMINADO: Los <script> de leaflet.js y rotatedMarker fueron removidos de aquí -->

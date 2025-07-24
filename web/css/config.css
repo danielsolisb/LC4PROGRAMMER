@@ -1,0 +1,111 @@
+/* web/css/config.css */
+
+/* --- Estructura de Pestañas --- */
+.config-tabs {
+    display: flex;
+    border-bottom: 2px solid #3498db;
+    margin-bottom: 15px;
+}
+.config-tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    border-radius: 5px 5px 0 0;
+    font-weight: bold;
+}
+.config-tab.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+.config-tab-content {
+    display: none;
+}
+.config-tab-content.active {
+    display: block;
+}
+
+/* --- Layout de la Pestaña 1 --- */
+.intersection-layout {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 220px);
+}
+.intersection-sidebar {
+    flex: 0 0 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+}
+.intersection-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.config-panel {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+}
+.config-panel h5 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+/* --- Formulario de Propiedades y Feriados --- */
+.form-group { margin-bottom: 10px; }
+.form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+.form-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+#holidays-list { list-style: none; padding: 0; max-height: 150px; overflow-y: auto; }
+#holidays-list li { display: flex; justify-content: space-between; align-items: center; padding: 5px; border-bottom: 1px solid #e0e0e0; }
+.delete-holiday-btn { cursor: pointer; color: #e74c3c; }
+
+/* --- Matriz de Conflictos --- */
+#conflict-matrix-container { overflow-x: auto; }
+.conflict-matrix { border-collapse: collapse; font-size: 0.8em; }
+.conflict-matrix th, .conflict-matrix td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+.conflict-matrix th { background-color: #e9ecef; }
+.conflict-matrix input[type="checkbox"] { cursor: pointer; }
+
+/* --- Mapa y Herramientas --- */
+.map-toolbar { padding-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+.tool-btn { background-color: #2c3e50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; }
+.tool-btn:hover { background-color: #34495e; }
+#map-container { flex-grow: 1; border: 1px solid #ccc; border-radius: 5px; }
+#config-map { width: 100%; height: 100%; }
+
+/* --- Estilos para Popups de Leaflet --- */
+.leaflet-popup-content-wrapper { border-radius: 8px; }
+.popup-form-group { margin-top: 10px; }
+.popup-form-group label { font-weight: bold; }
+.popup-delete-btn { background-color: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 12px; }
+
+
+/* --- NUEVO: Estilos para la sección de Fecha/Hora --- */
+.datetime-display {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Courier New', Courier, monospace; /* Fuente monoespaciada para mejor alineación */
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 0.9em; /* Un poco más pequeño para que quepa bien */
+}
+
+.sync-btn {
+    width: 100%;
+    background-color: #3498db !important;
+}
+.sync-btn:hover {
+    background-color: #2980b9 !important;
+}
+

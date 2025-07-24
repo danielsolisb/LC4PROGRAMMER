@@ -8,7 +8,7 @@ import { initializeSequencesView } from './views/sequences.js';
 import { initializePlansView } from './views/plans.js';
 import { initializeMonitoringView, cleanupMonitoringView } from './views/monitoring.js';
 import { initializePlanVisualizerView } from './views/plan-visualizer.js';
-
+import { initializeConfigView } from './views/config.js';
 /**
  * Carga el contenido de una vista (HTML) en el área principal y luego
  * llama a la función de inicialización de JavaScript correspondiente.
@@ -52,6 +52,9 @@ async function loadView(viewName, forceReload = false) {
                 break;
             case 'plan-visualizer':
                 initializePlanVisualizerView();
+                break;
+            case 'config':
+                initializeConfigView();
                 break;
         }
     } catch (error) {

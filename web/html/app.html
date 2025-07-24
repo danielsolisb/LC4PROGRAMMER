@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LC4 Programmer</title>
     <link rel="stylesheet" href="/web/css/style.css">
+
+    <!-- ======================================================= -->
+    <!-- NUEVO: Añadir las librerías del mapa aquí -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- ======================================================= -->
+
 </head>
 <body>
     <div class="app-container">
@@ -20,14 +26,13 @@
                 <a href="#" id="nav-dashboard" class="active" onclick="loadView('dashboard')">Dashboard</a>
                 <a href="#" id="nav-sequences" onclick="loadView('sequences')">Editor de Secuencias</a>
                 <a href="#" id="nav-plans" onclick="loadView('plans')">Programador de Planes</a>
-                <a href="#" id="nav-plan-visualizer" onclick="loadView('plan-visualizer')">Visualizador de Planes</a>
                 <a href="#" id="nav-config" onclick="loadView('config')">Configuración</a>
                 <a href="#" id="nav-monitoring" onclick="loadView('monitoring')">Monitoreo en Tiempo Real</a>
+                <a href="#" id="nav-plan-visualizer" onclick="loadView('plan-visualizer')">Visualizador de Planes</a>
             </nav>
             <div class="sidebar-footer">
                 <a href="#" onclick="handleSaveGlobal()">Guardar Global</a>
                 <a href="#">Subir al Controlador</a>
-                <!-- --- CAMBIOS AQUÍ --- -->
                 <a href="#" id="btn-disconnect-app" onclick="handleAppDisconnect()">Desconectar</a>
                 <div id="app-status-indicator" class="status-indicator disconnected">
                     Desconectado
@@ -36,30 +41,23 @@
         </aside>
 
         <main id="main-content-area" class="main-content">
-            <!-- Las secciones de contenido no cambian -->
-            <section id="dashboard-section" class="content-section">
-                <div class="main-header"><h2>Dashboard y Estado General</h2></div>
-                <div class="info-box">
-                    <h4>Información del Controlador</h4>
-                    <p><strong>ID del Controlador:</strong> <span id="info-id">--</span></p>
-                    <p><strong>Fecha del Controlador:</strong> <span id="info-date">--</span></p>
-                    <p><strong>Hora del Controlador:</strong> <span id="info-time">--</span></p>
-                </div>
-            </section>
-            <section id="sequences-section" class="content-section" style="display: none;">
-                <div class="main-header"><h2>Editor de Secuencias</h2></div>
-                <p>Aquí construiremos la línea de tiempo para movimientos y secuencias.</p>
-            </section>
-            <!-- ... resto de secciones ... -->
+            <!-- El contenido de las vistas se carga aquí -->
         </main>
     </div>
     <!-- Modal de Carga -->
-<div id="loading-modal" class="loading-modal-overlay">
-    <div class="loading-modal-content">
-        <div class="spinner"></div>
-        <p>Capturando configuración, por favor espere...</p>
+    <div id="loading-modal" class="loading-modal-overlay">
+        <div class="loading-modal-content">
+            <div class="spinner"></div>
+            <p>Capturando configuración, por favor espere...</p>
+        </div>
     </div>
-</div>
+
+    <!-- ======================================================= -->
+    <!-- NUEVO: Añadir los scripts del mapa aquí, ANTES de app.js -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js"></script>
+    <!-- ======================================================= -->
+
     <script type="module" src="/web/js/app.js"></script>
 </body>
 </html>
