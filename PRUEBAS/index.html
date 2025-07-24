@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diseñador de Intersecciones Viales v2.0</title>
+
+    <!-- Librería Leaflet.js (CSS) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Tu hoja de estilos personalizada -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+    <div class="main-container">
+        <header>
+            <h1>Diseñador de Intersecciones Viales v2.0</h1>
+        </header>
+
+        <!-- Panel de Controles -->
+        <div id="controls">
+            <button id="add-vehicle-light" class="control-btn">Añadir Semáforo Vehicular</button>
+            <button id="add-pedestrian-light" class="control-btn">Añadir Semáforo Peatonal</button>
+            <button id="add-pedestrian-button" class="control-btn">Añadir Botón Peatonal</button>
+            <button id="add-street-direction" class="control-btn">Añadir Sentido de Vía</button>
+            <button id="save-design" class="control-btn save-btn">Guardar Diseño (JSON)</button>
+            <button id="load-design" class="control-btn load-btn">Cargar Diseño (JSON)</button>
+            <input type="file" id="file-input" accept=".json">
+        </div>
+
+        <!-- Contenedor del mapa -->
+        <div id="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <!-- Librería Leaflet.js (JavaScript) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Plugin para rotar marcadores en Leaflet -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js"></script>
+
+    <!-- Tu código JavaScript personalizado -->
+    <script src="script.js"></script>
+</body>
+</html>
