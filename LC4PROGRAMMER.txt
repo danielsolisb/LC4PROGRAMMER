@@ -1,0 +1,32 @@
+LC4PROGRAMMER
+├── .gitignore
+├── PRUEBAS
+│   ├── RELLENOGAE.py
+│   ├── code.py
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+├── README.md
+├── assets
+│   └── img
+│       └── cormar_logo.png
+├── communicator.py
+├── controller.py
+├── main.py
+├── requirements.txt
+└── web
+    ├── css
+    │   ├── config.css
+    │   ├── plan-visualizer.css
+    │   └── style.css
+    ├── html
+    │   ├── app.html
+    │   ├── views
+    │   └── welcome.html
+    └── js
+        ├── api.js
+        ├── app.js
+        ├── constants.js
+        ├── store.js
+        ├── ui.js
+        └── views
