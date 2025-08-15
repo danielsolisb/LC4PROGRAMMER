@@ -75,22 +75,49 @@ function renderPlanDetails(planId) {
     infoTablesContainer.innerHTML = '';
 
     const plan = hardwareData.plans.find(p => p.id === planId);
-    if (!plan) return;
+    if (!plan) {
+        gridContainer.innerHTML = `<p class="error-message">Error: No se encontró el Plan #${planId}.</p>`;
+        return;
+    }
 
     const detailsContainer = document.getElementById('plan-details-container');
     const dayDescription = DAY_TYPE_LEGEND[plan.day_type_id] || 'Desconocido';
     detailsContainer.innerHTML = `<p><strong>Secuencia Asociada:</strong> #${plan.sequence_id}</p><p><strong>Índice de Tiempo Seleccionado:</strong> T${plan.time_sel}</p><p><strong>Días de Aplicación:</strong> ${dayDescription} (Tipo ${plan.day_type_id})</p><p><strong>Hora de Inicio:</strong> ${String(plan.hour).padStart(2, '0')}:${String(plan.minute).padStart(2, '0')}</p>`;
 
     const sequence = hardwareData.sequences.find(s => s.id === plan.sequence_id);
-    if (!sequence || !sequence.movements) { gridContainer.innerHTML = '<p>Secuencia sin movimientos.</p>'; return; }
+    if (!sequence) {
+        gridContainer.innerHTML = `<p class="error-message">Error: El Plan #${planId} apunta a la Secuencia #${plan.sequence_id}, pero no se encontró. Verifique la configuración.</p>`;
+        return;
+    }
+    
+    if (!sequence.movements || sequence.movements.length === 0) {
+        gridContainer.innerHTML = '<p>La secuencia asociada a este plan no tiene movimientos definidos.</p>';
+        return;
+    }
 
-    const cycleMovements = sequence.movements.map(movId => hardwareData.movements.find(m => m.id === movId)).filter(Boolean);
+    const cycleMovements = sequence.movements.map(movId => {
+        const movement = hardwareData.movements.find(m => m.id === movId);
+        if (!movement) {
+            console.warn(`Advertencia: No se encontró el Movimiento #${movId} referenciado por la Secuencia #${sequence.id}.`);
+        }
+        return movement;
+    }).filter(Boolean); // Filtra los movimientos que no se encontraron (null/undefined)
+
+    if (cycleMovements.length === 0) {
+        gridContainer.innerHTML = `<p class="error-message">Error: Ninguno de los movimientos de la Secuencia #${sequence.id} fue encontrado. Verifique la configuración.</p>`;
+        return;
+    }
+
     const totalCycleTime = cycleMovements.reduce((total, mov) => total + (mov.times[plan.time_sel] || 0), 0);
-    if (totalCycleTime === 0) { gridContainer.innerHTML = '<p>Duración del ciclo es 0.</p>'; return; }
+    if (totalCycleTime === 0) {
+        gridContainer.innerHTML = '<p>La duración total del ciclo para este plan es 0. No se puede generar la línea de tiempo.</p>';
+        return;
+    }
 
-    const intermittenceRule = projectData.intermittences.find(i => i.plan_id === plan.id);
+    const intermittenceRule = hardwareData.intermittences.find(i => i.plan_id === plan.id);
 
-    // --- RENDERIZADO DE LA LÍNEA DE TIEMPO (sin cambios) ---
+    // --- El resto del renderizado de la línea de tiempo y las tablas continúa aquí... ---
+    // (Esta parte del código no necesita cambios)
     const barsArea = document.createElement('div');
     barsArea.className = 'timeline-bars-area';
     const majorTickInterval = totalCycleTime > 100 ? 10 : 5;
@@ -99,7 +126,6 @@ function renderPlanDetails(planId) {
     const minorTickPercent = (minorTickInterval / totalCycleTime) * 100;
     barsArea.style.backgroundImage = `repeating-linear-gradient(to right, #f0f0f0 0 1px, transparent 1px ${minorTickPercent}%), repeating-linear-gradient(to right, #ccc 0 1px, transparent 1px ${majorTickPercent}%)`;
     gridContainer.appendChild(barsArea);
-
     gridContainer.appendChild(Object.assign(document.createElement('div'), { className: 'grid-cell header grid-label' }));
     const rulerContentCell = Object.assign(document.createElement('div'), { className: 'grid-cell header timeline-ruler-content' });
     for (let t = 0; t <= totalCycleTime; t += minorTickInterval) {
@@ -117,7 +143,6 @@ function renderPlanDetails(planId) {
         }
     }
     gridContainer.appendChild(rulerContentCell);
-
     gridContainer.appendChild(Object.assign(document.createElement('div'), { className: 'grid-cell header grid-label', textContent: 'Etapa' }));
     const stageContentCell = Object.assign(document.createElement('div'), { className: 'grid-cell header timeline-stages-content' });
     let accumulatedTime = 0;
@@ -138,7 +163,6 @@ function renderPlanDetails(planId) {
         }
     });
     gridContainer.appendChild(stageContentCell);
-
     for (let i = 1; i <= 8; i++) {
         gridContainer.appendChild(Object.assign(document.createElement('div'), { className: 'grid-cell grid-label', textContent: `G${i}` }));
         const barContainerCell = Object.assign(document.createElement('div'), { className: 'grid-cell timeline-bar-container' });
@@ -187,30 +211,14 @@ function renderPlanDetails(planId) {
         });
         gridContainer.appendChild(barContainerCell);
     }
-    
-    // --- NUEVO: RENDERIZADO DE LAS TABLAS DE INFORMACIÓN ---
-    
-    // 1. Tabla de Detalles de Movimientos
-    let movementsTableHTML = `
-        <div class="info-table-wrapper">
-            <h5>Detalle de Movimientos</h5>
-            <table class="info-table">
-                <thead><tr><th>Movimiento</th><th>Luces Activas</th><th>Tiempo (s)</th></tr></thead>
-                <tbody>`;
+    let movementsTableHTML = `<div class="info-table-wrapper"><h5>Detalle de Movimientos</h5><table class="info-table"><thead><tr><th>Movimiento</th><th>Luces Activas</th><th>Tiempo (s)</th></tr></thead><tbody>`;
     cycleMovements.forEach(mov => {
         const duration = mov.times[plan.time_sel] || 0;
         const activeLights = getActiveLightsForMovement(mov);
         movementsTableHTML += `<tr><td>${mov.id}</td><td class="light-list">${activeLights}</td><td>${duration}</td></tr>`;
     });
     movementsTableHTML += `</tbody></table></div>`;
-
-    // 2. Tabla de Verdes Efectivos
-    let greensTableHTML = `
-        <div class="info-table-wrapper">
-            <h5>Verdes Efectivos</h5>
-            <table class="info-table">
-                <thead><tr><th>#</th><th>Movimiento</th><th>Grupos con Verde</th><th>Tiempo (s)</th></tr></thead>
-                <tbody>`;
+    let greensTableHTML = `<div class="info-table-wrapper"><h5>Verdes Efectivos</h5><table class="info-table"><thead><tr><th>#</th><th>Movimiento</th><th>Grupos con Verde</th><th>Tiempo (s)</th></tr></thead><tbody>`;
     let effectiveGreenCounter = 0;
     cycleMovements.forEach(mov => {
         const duration = mov.times[plan.time_sel] || 0;
@@ -227,16 +235,25 @@ function renderPlanDetails(planId) {
         }
     });
     greensTableHTML += `</tbody></table></div>`;
-    
     infoTablesContainer.innerHTML = movementsTableHTML + greensTableHTML;
 }
 
 // --- Función de Inicialización Principal ---
 export function initializePlanVisualizerView() {
     const projectData = getProjectData();
+    // Hacemos una comprobación segura. Si hardware_config no existe, usamos un objeto vacío.
+    const hardwareData = projectData.hardware_config || {}; 
+
     renderLegend();
-    renderPlanTabs(projectData.hardware_config?.plans);
-    if (projectData.hardware_config?.plans?.length > 0) {
-        renderPlanDetails(projectData.hardware_config.plans[0].id);
+    renderPlanTabs(hardwareData.plans); // Ahora esto nunca fallará
+
+    // Solo intentamos renderizar los detalles si realmente hay planes
+    if (hardwareData.plans && hardwareData.plans.length > 0) {
+        renderPlanDetails(hardwareData.plans[0].id);
+    } else {
+        // Si no hay planes, limpiamos las otras secciones para que no muestren datos viejos
+        document.getElementById('plan-details-container').innerHTML = '<p>No hay planes para visualizar.</p>';
+        document.getElementById('timeline-grid-container').innerHTML = '';
+        document.getElementById('info-tables-container').innerHTML = '';
     }
 }

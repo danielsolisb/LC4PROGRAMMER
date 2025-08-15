@@ -7,24 +7,38 @@ export function getProjectData() {
 }
 
 export function setProjectData(newData) {
+    // Asignamos los nuevos datos directamente.
     projectData = newData;
 
-    // --- LÓGICA DE INICIALIZACIÓN MODIFICADA ---
-    // Si los datos cargados no tienen la sección de configuración del software, la creamos.
+    // --- LÓGICA DE INICIALIZACIÓN A PRUEBA DE FALLOS ---
+    // Nos aseguramos de que toda la estructura exista, rellenando lo que falte.
+
+    if (!projectData.hardware_config) {
+        projectData.hardware_config = {};
+    }
+    // Verificamos cada propiedad que debe ser un array
+    const hardwareArrays = ['movements', 'sequences', 'plans', 'intermittences', 'holidays', 'flow_rules'];
+    hardwareArrays.forEach(key => {
+        if (!Array.isArray(projectData.hardware_config[key])) {
+            projectData.hardware_config[key] = [];
+        }
+    });
+    if (!projectData.hardware_config.info) {
+        projectData.hardware_config.info = {};
+    }
+
+
     if (!projectData.software_config) {
         projectData.software_config = {};
     }
     
-    // Si no existe la configuración de la intersección dentro de la config del software, la creamos.
     if (!projectData.software_config.intersection) {
-        // Usamos la info del hardware si existe
-        const controller_id = projectData.hardware_config?.info?.controller_id || 'Sin Asignar';
+        const controller_id = projectData.hardware_config.info?.controller_id || 'Sin Asignar';
         
         projectData.software_config.intersection = {
             properties: {
                 controller_id: controller_id,
                 name: 'Nueva Intersección',
-                // Coordenadas por defecto (Guayaquil)
                 coordinates: { lat: -2.170, lng: -79.900 } 
             },
             map_view: {
@@ -32,13 +46,12 @@ export function setProjectData(newData) {
                 lng: -79.900,
                 zoom: 18
             },
-            elements: [], // Para los iconos del mapa
-            // Matriz de 8x8 inicializada en false
+            elements: [],
             conflict_matrix: Array(8).fill(null).map(() => Array(8).fill(false))
         };
     }
     
-    console.log("Datos del proyecto actualizados:", projectData);
+    console.log("Datos del proyecto actualizados y validados:", projectData);
 }
 
 
