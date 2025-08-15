@@ -109,3 +109,48 @@
     background-color: #2980b9 !important;
 }
 
+/* Estilo para el Pin de Ubicación de la Intersección (Objetivo 1) */
+.intersection-pin-svg {
+    fill: #e74c3c; /* Un color rojo distintivo */
+    stroke: #ffffff;
+    stroke-width: 1.5px;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+}
+
+/* Contenedor para el ícono y su etiqueta */
+.map-icon-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Etiqueta para el nombre del grupo (G1, G2, etc.) (Objetivo 2) */
+.map-icon-label {
+    position: absolute;
+    bottom: -20px; /* Posición debajo del ícono */
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    /* Por defecto, la etiqueta está oculta (Objetivo 3) */
+    display: none; 
+}
+
+/* Clase para hacer visible la etiqueta en zoom alto (Objetivo 3) */
+.label-visible .map-icon-label {
+    display: block; /* La mostramos cuando el JS añada la clase */
+}
+
+/* Evitar que el ícono se encoja a tamaños absurdos en zoom out (Objetivo 3) */
+.leaflet-div-icon {
+    background: none;
+    border: none;
+}
+.map-icon-svg svg {
+    min-width: 15px; /* Tamaño mínimo para que no desaparezca */
+    min-height: 15px;
+}

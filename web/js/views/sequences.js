@@ -8,11 +8,12 @@ function displaySelectedSequence() {
     const selector = document.getElementById('sequence-selector');
     const sequenceId = parseInt(selector.value, 10);
     const timelineContainer = document.getElementById('timeline-container');
+    const hardwareData = projectData.hardware_config;
     timelineContainer.innerHTML = '';
 
-    if (isNaN(sequenceId) || !projectData.sequences) return;
+    if (isNaN(sequenceId) || !hardwareData.sequences) return;
     
-    const sequence = projectData.sequences.find(s => s.id === sequenceId);
+    const sequence = hardwareData.sequences.find(s => s.id === sequenceId);
     if (!sequence) return;
 
     timelineContainer.style.gridTemplateColumns = `auto repeat(${LIGHT_ORDER.length}, 1fr) auto`;
@@ -23,7 +24,7 @@ function displaySelectedSequence() {
     timelineContainer.insertAdjacentHTML('beforeend', '<div class="timeline-cell timeline-header">Tiempos</div>');
 
     sequence.movements.forEach(movementId => {
-        const movement = projectData.movements.find(m => m.id === movementId);
+        const movement = hardwareData.movements.find(m => m.id === movementId);
         if (!movement) return;
 
         timelineContainer.insertAdjacentHTML('beforeend', `<div class="timeline-cell movement-name">Movimiento ${movement.id}</div>`);
@@ -46,18 +47,19 @@ function displaySelectedSequence() {
 
 export function initializeSequencesView() {
     const projectData = getProjectData();
+    const hardwareData = projectData.hardware_config;
     const selector = document.getElementById('sequence-selector');
     if (!selector) return;
 
     selector.innerHTML = '<option value="">-- Seleccione una secuencia --</option>';
-    if (projectData && projectData.sequences) {
-        projectData.sequences.forEach(seq => {
+    if (hardwareData && hardwareData.sequences) {
+        hardwareData.sequences.forEach(seq => {
             const option = new Option(`Secuencia #${seq.id}`, seq.id);
             selector.add(option);
         });
         // Seleccionar la primera por defecto y mostrarla
-        if (projectData.sequences.length > 0) {
-            selector.value = projectData.sequences[0].id;
+        if (hardwareData.sequences.length > 0) {
+            selector.value = hardwareData.sequences[0].id;
         }
     }
     

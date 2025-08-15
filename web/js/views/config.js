@@ -1,10 +1,13 @@
 // web/js/views/config.js
 
 import { getProjectData } from '../store.js';
+import { api } from '../api.js';
 
 // --- VARIABLES GLOBALES Y CONSTANTES DE LA VISTA ---
 let map;
+let intersectionPin = null; // ¡NUEVO! Variable para el pin de la intersección
 let mapMarkers = {};
+
 let elementCounter = 0;
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -53,15 +56,17 @@ function initializeIntersectionTab() {
     renderConflictMatrix();
     initializeMapWhenReady();
     setupMapToolbar();
+    document.getElementById('sync-datetime-btn').addEventListener('click', syncDateTimeWithController);
 }
 
 // --- RENDERIZADO DE COMPONENTES (sin cambios) ---
 function renderGeneralProperties() {
     const container = document.getElementById('general-properties-form');
-    const props = getProjectData().intersection.properties;
+    const props = getProjectData().software_config.intersection.properties;
     container.innerHTML = `<div class="form-group"><label for="controller-id">ID del Controlador</label><input type="text" id="controller-id" value="${props.controller_id || ''}"></div><div class="form-group"><label for="intersection-name">Nombre de la Intersección</label><input type="text" id="intersection-name" value="${props.name || ''}"></div><div class="form-group"><label>Fecha, Hora y Día del Sistema</label><div id="current-datetime" class="datetime-display">Cargando...</div><button id="sync-datetime-btn" class="tool-btn sync-btn">Sincronizar con Controlador</button></div>`;
-    document.getElementById('controller-id').addEventListener('input', (e) => getProjectData().intersection.properties.controller_id = e.target.value);
-    document.getElementById('intersection-name').addEventListener('input', (e) => getProjectData().intersection.properties.name = e.target.value);
+    document.getElementById('controller-id').addEventListener('input', (e) => getProjectData().software_config.intersection.properties.controller_id = e.target.value);
+    document.getElementById('intersection-name').addEventListener('input', (e) => getProjectData().software_config.intersection.properties.name = e.target.value);
+   
     const datetimeDisplay = document.getElementById('current-datetime');
     setInterval(() => {
         const now = new Date();
@@ -76,7 +81,7 @@ function renderGeneralProperties() {
 function renderHolidays() { document.getElementById('holidays-editor').innerHTML = `<p>Editor de Feriados (funcionalidad futura).</p>`; }
 function renderConflictMatrix() {
     const container = document.getElementById('conflict-matrix-container');
-    const matrix = getProjectData().intersection.conflict_matrix;
+    const matrix = getProjectData().software_config.intersection.conflict_matrix;
     let html = '<table class="conflict-matrix"><thead><tr><th></th>';
     for (let i = 1; i <= 8; i++) { html += `<th>G${i}</th>`; }
     html += '</tr></thead><tbody>';
@@ -117,7 +122,7 @@ function initializeMap() {
     const mapContainer = document.getElementById('config-map');
     if (mapContainer && mapContainer._leaflet_id) map.remove();
     
-    const mapView = getProjectData().intersection.map_view;
+    const mapView = getProjectData().software_config.intersection.map_view;
     map = L.map('config-map').setView([mapView.lat, mapView.lng], mapView.zoom);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
@@ -128,15 +133,51 @@ function initializeMap() {
     map.on('moveend zoomend', () => {
         const center = map.getCenter();
         const zoom = map.getZoom();
-        getProjectData().intersection.map_view.lat = center.lat;
-        getProjectData().intersection.map_view.lng = center.lng;
-        getProjectData().intersection.map_view.zoom = zoom;
+        getProjectData().software_config.intersection.map_view.lat = center.lat;
+        getProjectData().software_config.intersection.map_view.lng = center.lng;
+        getProjectData().software_config.intersection.map_view.zoom = zoom;
         updateIconLabelsZoom(); // Actualizar etiquetas al cambiar el zoom
     });
 
+    addIntersectionPin();
     renderElementsOnMap();
     updateIconLabelsZoom(); // Llamada inicial
 }
+
+function addIntersectionPin() {
+    const intersectionConfig = getProjectData().software_config.intersection;
+    const pinCoords = intersectionConfig.properties.coordinates;
+
+    // Creamos un ícono especial para este pin
+    const pinIcon = L.divIcon({
+        html: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="intersection-pin-svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>',
+        className: 'intersection-pin-icon',
+        iconSize: [30, 42],
+        iconAnchor: [15, 42]
+    });
+
+    if (intersectionPin) {
+        map.removeLayer(intersectionPin);
+    }
+
+    intersectionPin = L.marker([pinCoords.lat, pinCoords.lng], {
+        icon: pinIcon,
+        draggable: true, // Hacemos que se pueda arrastrar
+        zIndexOffset: 1000 // Para que siempre esté por encima
+    }).addTo(map);
+
+    intersectionPin.bindPopup("<b>Ubicación de la Intersección</b><br>Arrastra para reubicar.");
+
+    // Guardar la nueva posición cuando se termine de arrastrar
+    intersectionPin.on('dragend', (e) => {
+        const newLatLng = e.target.getLatLng();
+        intersectionConfig.properties.coordinates.lat = newLatLng.lat;
+        intersectionConfig.properties.coordinates.lng = newLatLng.lng;
+        console.log('Nueva ubicación de intersección guardada:', newLatLng);
+    });
+}
+
+
 
 function updateIconLabelsZoom() {
     if (!map) return;
@@ -166,7 +207,7 @@ function setupMapToolbar() {
 function renderElementsOnMap() {
     for (const id in mapMarkers) { map.removeLayer(mapMarkers[id]); }
     mapMarkers = {};
-    const elements = getProjectData().intersection.elements;
+    const elements = getProjectData().software_config.intersection.elements;
     let maxId = -1;
     elements.forEach(element => {
         addElementToMap(element.type, { lat: element.lat, lng: element.lng }, element);
@@ -181,6 +222,7 @@ function createDivIcon(type, name = '') {
     const size = iconSizes[type] || [30, 30];
     const svg = ICON_SVG_STRINGS[type];
     
+    // El 'name' (ej: G1) ahora se renderiza directamente en el HTML del ícono
     return L.divIcon({
         html: `<div class="map-icon-wrapper">
                    <div class="map-icon-svg" style="width:${size[0]}px; height:${size[1]}px;">${svg}</div>
@@ -195,7 +237,7 @@ function createDivIcon(type, name = '') {
 function addElementToMap(type, latlng, loadedElement = null) {
     const id = loadedElement ? loadedElement.id : `${type}_${elementCounter++}`;
     const elementData = loadedElement || { id, type, lat: latlng.lat, lng: latlng.lng, rotation: 0, name: '' };
-    if (!loadedElement) getProjectData().intersection.elements.push(elementData);
+    if (!loadedElement) getProjectData().software_config.intersection.elements.push(elementData);
 
     const marker = L.marker([elementData.lat, elementData.lng], {
         icon: createDivIcon(type, elementData.name),

@@ -48,6 +48,7 @@ function drawPlanCard(plan, dayIndex, startTimeInMinutes, endTimeInMinutes) {
 export function initializePlansView() {
     const container = document.getElementById('plan-schedule-container');
     const projectData = getProjectData();
+    const hardwareData = projectData.hardware_config;
     if (!container) return;
     container.innerHTML = '';
 
@@ -59,11 +60,11 @@ export function initializePlansView() {
         for (let i = 0; i < 8; i++) { container.insertAdjacentHTML('beforeend', `<div class="schedule-cell"></div>`); }
     }
 
-    if (!projectData || !projectData.plans || projectData.plans.length === 0) return;
+    if (!hardwareData || !hardwareData.plans || hardwareData.plans.length === 0) return;
 
     const weeklySchedule = {};
     for (let i = 0; i < 8; i++) { weeklySchedule[i] = []; }
-    projectData.plans.forEach(plan => {
+    hardwareData.plans.forEach(plan => {
         const applicableDays = DAY_TYPE_MAP[plan.day_type_id];
         if (applicableDays) {
             applicableDays.forEach(dayIndex => {

@@ -68,22 +68,23 @@ function getActiveLightsForMovement(movement) {
  */
 function renderPlanDetails(planId) {
     const projectData = getProjectData();
+    const hardwareData = projectData.hardware_config;
     const gridContainer = document.getElementById('timeline-grid-container');
     const infoTablesContainer = document.getElementById('info-tables-container');
     gridContainer.innerHTML = '';
     infoTablesContainer.innerHTML = '';
 
-    const plan = projectData.plans.find(p => p.id === planId);
+    const plan = hardwareData.plans.find(p => p.id === planId);
     if (!plan) return;
 
     const detailsContainer = document.getElementById('plan-details-container');
     const dayDescription = DAY_TYPE_LEGEND[plan.day_type_id] || 'Desconocido';
     detailsContainer.innerHTML = `<p><strong>Secuencia Asociada:</strong> #${plan.sequence_id}</p><p><strong>Índice de Tiempo Seleccionado:</strong> T${plan.time_sel}</p><p><strong>Días de Aplicación:</strong> ${dayDescription} (Tipo ${plan.day_type_id})</p><p><strong>Hora de Inicio:</strong> ${String(plan.hour).padStart(2, '0')}:${String(plan.minute).padStart(2, '0')}</p>`;
 
-    const sequence = projectData.sequences.find(s => s.id === plan.sequence_id);
+    const sequence = hardwareData.sequences.find(s => s.id === plan.sequence_id);
     if (!sequence || !sequence.movements) { gridContainer.innerHTML = '<p>Secuencia sin movimientos.</p>'; return; }
 
-    const cycleMovements = sequence.movements.map(movId => projectData.movements.find(m => m.id === movId)).filter(Boolean);
+    const cycleMovements = sequence.movements.map(movId => hardwareData.movements.find(m => m.id === movId)).filter(Boolean);
     const totalCycleTime = cycleMovements.reduce((total, mov) => total + (mov.times[plan.time_sel] || 0), 0);
     if (totalCycleTime === 0) { gridContainer.innerHTML = '<p>Duración del ciclo es 0.</p>'; return; }
 
@@ -234,8 +235,8 @@ function renderPlanDetails(planId) {
 export function initializePlanVisualizerView() {
     const projectData = getProjectData();
     renderLegend();
-    renderPlanTabs(projectData.plans);
-    if (projectData.plans && projectData.plans.length > 0) {
-        renderPlanDetails(projectData.plans[0].id);
+    renderPlanTabs(projectData.hardware_config?.plans);
+    if (projectData.hardware_config?.plans?.length > 0) {
+        renderPlanDetails(projectData.hardware_config.plans[0].id);
     }
 }
