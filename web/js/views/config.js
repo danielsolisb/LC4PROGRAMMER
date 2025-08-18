@@ -10,6 +10,7 @@ let mapMarkers = {};
 
 let elementCounter = 0;
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MAX_HOLIDAYS = 20;
 
 // --- ÍCONOS SVG (se usarán dentro de divIcon) ---
 const ICON_SVG_STRINGS = {
@@ -30,6 +31,7 @@ function setupTabSwitching() {
     const tabs = document.querySelectorAll('.config-tab');
     const tabContents = document.querySelectorAll('.config-tab-content');
     let isIntersectionTabInitialized = false;
+    let isSequencesTabInitialized = false;
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -44,6 +46,13 @@ function setupTabSwitching() {
                     isIntersectionTabInitialized = true;
                 } else if (map) {
                     setTimeout(() => map.invalidateSize(), 150);
+                }
+            } else if (tab.dataset.tab === 'tab-sequences') {
+                if (!isSequencesTabInitialized) {
+                    initializeSequencesTab();
+                    isSequencesTabInitialized = true;
+                } else {
+                    renderSequenceList();
                 }
             }
         });
@@ -78,7 +87,181 @@ function renderGeneralProperties() {
         alert(`Sincronizando...\nPayload a enviar:\n${JSON.stringify(payload, null, 2)}`);
     });
 }
-function renderHolidays() { document.getElementById('holidays-editor').innerHTML = `<p>Editor de Feriados (funcionalidad futura).</p>`; }
+
+// --- LÓGICA DE SECUENCIAS ---
+
+function renderSequencesEditor() {
+    renderSequenceList();
+}
+// --- LÓGICA PARA SECUENCIAS Y MOVIMIENTOS ---
+
+function initializeSequencesTab() {
+    renderSequenceList();
+}
+
+function renderSequenceList() {
+    const project = getProjectData();
+    const hardware = project.hardware_config;
+    const container = document.getElementById('tab-sequences');
+    if (!container) return;
+
+    // Calcular el próximo ID disponible tomando el mayor existente + 1
+    const nextSequenceId = hardware.sequences.reduce((max, seq) => Math.max(max, seq.id), 0) + 1;
+
+    container.innerHTML = `
+        <div id="sequence-list"></div>
+        <button id="add-sequence-btn" class="tool-btn">Añadir Secuencia</button>
+    `;
+
+    const list = container.querySelector('#sequence-list');
+
+    hardware.sequences.forEach(seq => {
+        const seqDiv = document.createElement('div');
+        seqDiv.className = 'sequence-item';
+        seqDiv.innerHTML = `
+            <h5>Secuencia ${seq.id}</h5>
+            <button class="delete-sequence-btn tool-btn" data-id="${seq.id}">Eliminar Secuencia</button>
+            <ul class="movement-list"></ul>
+            <button class="add-movement-btn tool-btn" data-id="${seq.id}">Añadir Movimiento</button>
+        `;
+        const movList = seqDiv.querySelector('.movement-list');
+        seq.movements.forEach(movId => {
+            const li = document.createElement('li');
+            li.innerHTML = `Movimiento ${movId} <button class="delete-movement-btn tool-btn" data-seqid="${seq.id}" data-movid="${movId}">Eliminar</button>`;
+            movList.appendChild(li);
+        });
+        list.appendChild(seqDiv);
+    });
+
+    container.querySelector('#add-sequence-btn').addEventListener('click', () => {
+        hardware.sequences.push({ id: nextSequenceId, movements: [] });
+        renderSequenceList();
+    });
+
+    container.querySelectorAll('.add-movement-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            const seqId = parseInt(e.target.dataset.id, 10);
+            const sequence = hardware.sequences.find(s => s.id === seqId);
+            if (!sequence) return;
+            const nextMovId = hardware.movements.reduce((max, m) => Math.max(max, m.id), 0) + 1;
+            const newMov = { id: nextMovId, portD: '00', portE: '00', portF: '00', portH: '00', portJ: '00', times: [] };
+            hardware.movements.push(newMov);
+            sequence.movements.push(nextMovId);
+            renderSequenceList();
+        });
+    });
+
+    container.querySelectorAll('.delete-sequence-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            const seqId = parseInt(e.target.dataset.id, 10);
+            const seqIndex = hardware.sequences.findIndex(s => s.id === seqId);
+            if (seqIndex === -1) return;
+            const seq = hardware.sequences[seqIndex];
+            // Eliminar movimientos asociados de la lista global
+            seq.movements.forEach(movId => {
+                const movIndex = hardware.movements.findIndex(m => m.id === movId);
+                if (movIndex > -1) hardware.movements.splice(movIndex, 1);
+            });
+            hardware.sequences.splice(seqIndex, 1);
+            renderSequenceList();
+        });
+    });
+
+    container.querySelectorAll('.delete-movement-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            const seqId = parseInt(e.target.dataset.seqid, 10);
+            const movId = parseInt(e.target.dataset.movid, 10);
+            const sequence = hardware.sequences.find(s => s.id === seqId);
+            if (!sequence) return;
+            sequence.movements = sequence.movements.filter(id => id !== movId);
+            const movIndex = hardware.movements.findIndex(m => m.id === movId);
+            if (movIndex > -1) hardware.movements.splice(movIndex, 1);
+            renderSequenceList();
+        });
+    });
+}
+
+function renderSequenceDetails(seqId) {
+    const detailsContainer = document.getElementById('sequence-details');
+    const sequences = getProjectData().hardware_config.sequences || [];
+    const sequence = sequences.find(s => s.id === seqId);
+
+    if (!sequence) {
+        detailsContainer.innerHTML = '<p>Seleccione una secuencia.</p>';
+        return;
+    }
+
+    let html = `<p><strong>Secuencia #${sequence.id}</strong></p>`;
+    if (sequence.movements && sequence.movements.length) {
+        html += '<ul>';
+        sequence.movements.forEach(mov => {
+            html += `<li>Movimiento ${mov}</li>`;
+        });
+        html += '</ul>';
+    } else {
+        html += '<p>Sin movimientos.</p>';
+    }
+    detailsContainer.innerHTML = html;
+}
+//function renderHolidays() { document.getElementById('holidays-editor').innerHTML = `<p>Editor de Feriados (funcionalidad futura).</p>`; }
+function renderHolidays() {
+    const container = document.getElementById('holidays-editor');
+    const holidays = getProjectData().hardware_config.holidays;
+
+    container.innerHTML = `
+        <div class="form-group">
+            <label>Agregar Feriado</label>
+            <div style="display:flex; gap:5px;">
+                <input type="number" id="holiday-day" min="1" max="31" placeholder="Día">
+                <input type="number" id="holiday-month" min="1" max="12" placeholder="Mes">
+                <button id="add-holiday-btn" class="tool-btn">Añadir</button>
+            </div>
+        </div>
+        <ul id="holidays-list"></ul>
+    `;
+
+    const list = container.querySelector('#holidays-list');
+    const addBtn = container.querySelector('#add-holiday-btn');
+
+    function renderList() {
+        list.innerHTML = '';
+        holidays.forEach((h, idx) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${String(h.day).padStart(2,'0')}/${String(h.month).padStart(2,'0')}</span>` +
+                `<span class="delete-holiday-btn" data-idx="${idx}">✖</span>`;
+            list.appendChild(li);
+        });
+        holidays.forEach((h, idx) => h.id = idx); // mantener ids consistentes
+        addBtn.disabled = holidays.length >= MAX_HOLIDAYS;
+    }
+
+    addBtn.addEventListener('click', () => {
+        const day = parseInt(container.querySelector('#holiday-day').value, 10);
+        const month = parseInt(container.querySelector('#holiday-month').value, 10);
+        if (isNaN(day) || isNaN(month) || day < 1 || day > 31 || month < 1 || month > 12) {
+            alert('Fecha inválida');
+            return;
+        }
+        if (holidays.length >= MAX_HOLIDAYS) {
+            alert(`Máximo ${MAX_HOLIDAYS} feriados permitidos.`);
+            return;
+        }
+        holidays.push({ id: holidays.length, day, month });
+        container.querySelector('#holiday-day').value = '';
+        container.querySelector('#holiday-month').value = '';
+        renderList();
+    });
+
+    list.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-holiday-btn')) {
+            const idx = parseInt(e.target.dataset.idx, 10);
+            holidays.splice(idx, 1);
+            renderList();
+        }
+    });
+
+    renderList();
+}
 function renderConflictMatrix() {
     const container = document.getElementById('conflict-matrix-container');
     const matrix = getProjectData().software_config.intersection.conflict_matrix;
@@ -100,6 +283,15 @@ function renderConflictMatrix() {
             const symmetricCheckbox = container.querySelector(`input[data-row="${col}"][data-col="${row}"]`);
             if (symmetricCheckbox) symmetricCheckbox.checked = isChecked;
         });
+    });
+}
+
+// Verifica si un grupo candidato puede ser utilizado en un movimiento
+function isGroupAllowed(sequenceMovements, candidateGroupId) {
+    const matrix = getProjectData().software_config.intersection.conflict_matrix;
+    return !sequenceMovements.some(existingGroupId => {
+        if (!existingGroupId) return false;
+        return matrix[candidateGroupId - 1]?.[existingGroupId - 1];
     });
 }
 
@@ -269,8 +461,12 @@ function createPopupContent(elementData) {
     if (options[type]) {
         const label = { group: 'Grupo Semafórico', pedestrian: 'Semáforo Peatonal', demand: 'Botón de Demanda' }[type];
         let optionHTML = '<option value="">Sin Asignar</option>';
+        const sequenceMovements = getProjectData().software_config?.intersection?.sequence_movements || [];
         options[type].forEach(opt => {
-            optionHTML += `<option value="${opt}" ${name === opt ? 'selected' : ''}>${opt}</option>`;
+            const groupNum = parseInt(opt.replace(/\D/g, ''), 10);
+            const allowed = isGroupAllowed(sequenceMovements, groupNum);
+            const disabledAttr = allowed ? '' : 'disabled class="conflict-option"';
+            optionHTML += `<option value="${opt}" ${name === opt ? 'selected' : ''} ${disabledAttr}>${opt}</option>`;
         });
         nameSelector = `<div class="popup-form-group"><label for="name-${id}">${label}</label><select id="name-${id}">${optionHTML}</select></div>`;
     }

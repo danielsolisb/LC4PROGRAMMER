@@ -47,6 +47,42 @@
     min-width: 0;
     overflow: hidden;
 }
+/* --- Layout de la Pestaña 2 --- */
+.sequences-layout {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 220px);
+}
+
+.sequences-sidebar {
+    flex: 0 0 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+}
+
+.sequences-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.sequence-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.sequence-item {
+    padding: 5px;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+}
+.sequence-item:hover {
+    background-color: #f0f0f0;
+}
+
 .config-panel {
     background: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -153,4 +189,9 @@
 .map-icon-svg svg {
     min-width: 15px; /* Tamaño mínimo para que no desaparezca */
     min-height: 15px;
+}
+
+/* Opciones deshabilitadas en el selector de grupos por conflictos */
+.conflict-option {
+    color: red;
 }
