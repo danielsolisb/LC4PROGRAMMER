@@ -1,16 +1,2 @@
 pywebview==5.4
 pyserial==3.5
-
-assets
-|_ cormar_logo.png
-web
-|_css
-    - style.css
-|_js
-    - app.js
-|_html
-    - app.html
-    - welcome.html
-communicator.py
-main.py
-requierements.txt
