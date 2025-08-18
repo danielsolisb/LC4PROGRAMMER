@@ -120,6 +120,7 @@ window.loadView = loadView;
 window.goBackToWelcome = api.goToWelcome;
 window.handleSaveGlobal = async () => {
     try {
+        await api.updateProjectData(getProjectData());
         const result = await api.saveProjectFile();
         alert(result.message);
     } catch (e) {

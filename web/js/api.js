@@ -5,6 +5,7 @@ export const api = {
     newProject: () => window.pywebview.api.new_project(),
     openProjectFile: () => window.pywebview.api.open_project_file(),
     saveProjectFile: () => window.pywebview.api.save_project_file(),
+    updateProjectData: (data) => window.pywebview.api.update_project_data(JSON.stringify(data)),
     goToWelcome: () => window.pywebview.api.go_to_welcome(),
     
     // Conexión

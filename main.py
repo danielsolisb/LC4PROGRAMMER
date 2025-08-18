@@ -125,6 +125,10 @@ class Api:
     def get_project_data_from_memory(self):
         self._controller.project_data['is_connected'] = self._communicator.is_connected
         return self._controller.project_data
+
+    def update_project_data(self, project_json):
+        """Reemplaza los datos del proyecto en memoria."""
+        self._controller.project_data = json.loads(project_json)
     def check_capture_result(self):
         """
         Permite al frontend preguntar si hay un resultado en la cola.
