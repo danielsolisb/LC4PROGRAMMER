@@ -341,3 +341,85 @@
     grid-template-columns: 60px 1fr;
     position: relative;
 }
+
+/* ===================================================================== */
+/* --- ESTILOS GLOBALES PARA LÍNEAS DE TIEMPO Y VISUALIZADORES --- */
+/* ===================================================================== */
+
+.timeline-wrapper {
+    overflow-x: auto;
+    border: 1px solid #999;
+    background-color: #fff;
+    padding: 5px;
+}
+
+.timeline-grid-container {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    position: relative;
+    min-width: 800px; /* Ancho mínimo para que no se comprima demasiado */
+}
+
+.timeline-bars-area {
+    grid-column: 2 / 3;
+    grid-row: 1 / -1;
+    position: relative;
+    background-size: 100% 100%;
+}
+
+.grid-cell { min-height: 25px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; }
+.grid-cell.header { height: 35px; font-size: 0.8em; font-weight: bold; border-bottom: 1px solid #333; position: sticky; top: 0; background-color: #f8f9fa; z-index: 2; }
+.grid-label { grid-column: 1 / 2; font-weight: bold; text-align: center; border-right: 1px solid #999; position: sticky; left: 0; background-color: #f8f9fa; z-index: 3; }
+
+.timeline-ruler-content, .timeline-stages-content, .timeline-bar-container { grid-column: 2 / 3; position: relative; width: 100%; height: 100%; }
+
+.stage-label { position: absolute; bottom: 2px; font-weight: bold; font-size: 0.8em; padding: 1px 3px; transform: translateX(-50%); }
+.stage-separator { position: absolute; top: 0; height: 100%; width: 1px; border-left: 1px dashed #aaa; }
+
+.timeline-bar-container { display: flex; }
+.timeline-segment {
+    height: 18px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.8em;
+    color: white;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+    overflow: hidden;
+    box-sizing: border-box;
+    border-right: 1px solid rgba(0,0,0,0.2);
+}
+
+.timeline-segment.red { background-color: #e74c3c; }
+.timeline-segment.amber { background-color: #f39c12; }
+.timeline-segment.green { background-color: #2ecc71; }
+.timeline-segment.gray { background-color: #bdc3c7; color: #555; text-shadow: none;}
+.timeline-segment.violet { background-color: #9b59b6; }
+
+/* --- Estilos para la Validación de Conflictos --- */
+.light-control.disabled {
+    opacity: 0.5;
+    pointer-events: none; /* Evita que se pueda hacer clic */
+}
+
+.conflict-warning {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+
+/* Estilo para la etiqueta del tipo de secuencia */
+.sequence-type {
+    font-size: 0.8em;
+    font-weight: normal;
+    color: #555;
+    background-color: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 5px;
+}

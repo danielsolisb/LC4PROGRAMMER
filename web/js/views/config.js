@@ -424,10 +424,10 @@ function attachPopupListeners(elementData, marker) {
 // =================================================================================
 
 function initializeSequencesTab() {
-    renderSequenceList(); // Renderiza la lista de la izquierda
-    
-    // Añade el listener para el botón "Añadir Nueva Secuencia"
+    renderSequenceList();
     document.getElementById('add-sequence-btn').addEventListener('click', handleAddSequence);
+    // Llamamos a la nueva función que prepara el modal
+    setupAddMovementModal(); 
 }
 
 /**
@@ -436,14 +436,19 @@ function initializeSequencesTab() {
 function renderSequenceList() {
     const container = document.getElementById('sequence-list-container');
     const hardware = getProjectData().hardware_config;
-    container.innerHTML = ''; // Limpiamos la lista antes de volver a dibujar
+    container.innerHTML = ''; 
 
     hardware.sequences.forEach(seq => {
         const seqBlock = document.createElement('div');
         seqBlock.className = 'sequence-block';
+
+        // --- MODIFICACIÓN AQUÍ ---
+        // Se añade un span para mostrar el tipo de secuencia.
+        const sequenceType = (seq.type === 0) ? 'Automática' : 'Bajo Demanda';
+        
         seqBlock.innerHTML = `
             <div class="sequence-header">
-                <h6>Secuencia ${seq.id}</h6>
+                <h6>Secuencia ${seq.id} <span class="sequence-type">(${sequenceType})</span></h6>
                 <button class="delete-btn" data-seq-id="${seq.id}">Eliminar</button>
             </div>
             <ul class="movement-list" id="movement-list-${seq.id}"></ul>
@@ -455,6 +460,7 @@ function renderSequenceList() {
             const li = document.createElement('li');
             li.className = 'movement-item';
             li.dataset.movId = movId;
+            li.dataset.seqId = seq.id;
             li.innerHTML = `
                 <span>Movimiento ${movId}</span>
                 <button class="delete-btn" data-seq-id="${seq.id}" data-mov-id="${movId}">X</button>
@@ -465,7 +471,6 @@ function renderSequenceList() {
         container.appendChild(seqBlock);
     });
 
-    // Añadimos los listeners para todos los nuevos elementos
     addSequenceListListeners();
 }
 
@@ -473,45 +478,39 @@ function renderSequenceList() {
  * Añade todos los event listeners a los elementos de la lista de secuencias.
  */
 function addSequenceListListeners() {
-    // Botones para ELIMINAR SECUENCIA
-    document.querySelectorAll('.sequence-header .delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const seqId = parseInt(e.target.dataset.seqId, 10);
-            handleDeleteSequence(seqId);
-        });
-    });
+    document.querySelectorAll('.sequence-header .delete-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSequence(parseInt(e.target.dataset.seqId, 10)); }));
 
-    // Botones para AÑADIR MOVIMIENTO
-    document.querySelectorAll('.add-movement-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const seqId = parseInt(e.target.dataset.seqId, 10);
-            handleAddMovement(seqId);
-        });
-    });
-    
-    // Items de MOVIMIENTO (para seleccionar y editar)
+    document.querySelectorAll('.add-movement-btn').forEach(btn => btn.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        const seqId = parseInt(e.target.dataset.seqId, 10);
+        if(window.showAddMovementModal) {
+            window.showAddMovementModal(seqId);
+        }
+    }));
+
     document.querySelectorAll('.movement-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            // Quitamos la clase 'active' de cualquier otro elemento
+        item.addEventListener('click', () => {
             document.querySelectorAll('.movement-item.active').forEach(i => i.classList.remove('active'));
-            // Añadimos 'active' al seleccionado
             item.classList.add('active');
             const movId = parseInt(item.dataset.movId, 10);
+            const seqId = parseInt(item.dataset.seqId, 10);
             renderMovementEditor(movId);
+            renderSequenceVisualizer(seqId, 0); 
         });
     });
 
-    // Botones para ELIMINAR MOVIMIENTO
+    // --- INICIO DE LA CORRECCIÓN ---
+    // Se corrige el typo de "movid" a "movId" para que coincida con el HTML
     document.querySelectorAll('.movement-item .delete-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evita que se dispare el click del item
-            const seqId = parseInt(e.target.dataset.seqId, 10);
-            const movId = parseInt(e.target.dataset.movId, 10);
-            handleDeleteMovement(seqId, movId);
+            e.stopPropagation();
+            handleDeleteMovement(
+                parseInt(e.target.dataset.seqId, 10),
+                parseInt(e.target.dataset.movId, 10) // Corregido aquí
+            );
         });
     });
+    // --- FIN DE LA CORRECCIÓN ---
 }
 
 /**
@@ -528,54 +527,51 @@ function renderMovementEditor(movId) {
         return;
     }
 
-    // Asegurarse de que el array de tiempos tenga 5 elementos
     while (movement.times.length < 5) {
         movement.times.push(0);
     }
 
-    // Generar los inputs para los tiempos
     let timesHTML = '<h5>Tiempos (segundos)</h5>';
     for (let i = 0; i < 5; i++) {
-        timesHTML += `
-            <div class="time-input-group">
-                <label for="time-input-${i}">T${i}</label>
-                <input type="number" id="time-input-${i}" class="time-input" data-time-index="${i}" value="${movement.times[i]}" min="0" max="255">
-            </div>
-        `;
+        timesHTML += `<div class="time-input-group"><label for="time-input-${i}">T${i}</label><input type="number" id="time-input-${i}" class="time-input" data-time-index="${i}" value="${movement.times[i]}" min="0" max="255"></div>`;
     }
 
-    // Generar los checkboxes para las luces
     const lightStates = hexPortsToLightStates(movement);
     let lightsHTML = '<h5>Grupos Semafóricos</h5><div class="lights-grid">';
-    for (let i = 1; i <= 8; i++) { // Iterar por Grupos G1 a G8
+    for (let i = 1; i <= 8; i++) {
         lightsHTML += `<div class="light-group"><div class="light-group-title">Grupo ${i}</div>`;
-        const lights = ['R', 'A', 'V']; // Rojo, Ámbar, Verde
-        lights.forEach(lightType => {
+        ['R', 'A', 'V'].forEach(lightType => {
             const lightId = `${lightType}${i}`;
-            if (LIGHT_MAP[lightId]) { // Verificar si la luz existe en el mapeo
+            if (LIGHT_MAP[lightId]) {
                 const isChecked = lightStates[lightId] ? 'checked' : '';
-                lightsHTML += `
-                    <div class="light-control">
-                        <input type="checkbox" id="light-check-${lightId}" data-light-id="${lightId}" ${isChecked}>
-                        <label for="light-check-${lightId}" class="light-label-${lightType}">${lightType}</label>
-                    </div>
-                `;
+                lightsHTML += `<div class="light-control"><input type="checkbox" id="light-check-${lightId}" data-light-id="${lightId}" ${isChecked}><label for="light-check-${lightId}" class="light-label-${lightType}">${lightType}</label></div>`;
             }
         });
         lightsHTML += `</div>`;
     }
     lightsHTML += '</div>';
 
-    // Construir el editor completo
     editorPanel.innerHTML = `
         <h4>Editando Movimiento ${movId}</h4>
         <div class="movement-editor-grid">
             <div class="times-editor">${timesHTML}</div>
             <div class="lights-editor">${lightsHTML}</div>
         </div>
+        <div id="conflict-warning-container"></div>
     `;
 
-    // Añadir listeners para los inputs y checkboxes
+    const updateVisualizer = () => {
+        const visualizer = document.getElementById('sequence-visualizer-container');
+        if (visualizer.style.display !== 'none') {
+            const activeItem = document.querySelector('.movement-item.active');
+            if (activeItem) {
+                const activeSeqId = parseInt(activeItem.dataset.seqId, 10);
+                const selectedTimeIndex = parseInt(document.getElementById('visualizer-time-select').value, 10);
+                renderSequenceVisualizer(activeSeqId, selectedTimeIndex);
+            }
+        }
+    };
+
     editorPanel.querySelectorAll('.time-input').forEach(input => {
         input.addEventListener('input', (e) => {
             const timeIndex = parseInt(e.target.dataset.timeIndex, 10);
@@ -583,36 +579,56 @@ function renderMovementEditor(movId) {
             if (value < 0) value = 0;
             if (value > 255) value = 255;
             movement.times[timeIndex] = value;
-            e.target.value = value; // Corregir el valor en el input si está fuera de rango
+            e.target.value = value;
+            updateVisualizer();
         });
     });
 
     editorPanel.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
         checkbox.addEventListener('change', () => {
-            // Recalcular todos los puertos hexadecimales desde cero
             const currentLightStates = {};
             editorPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
                 currentLightStates[cb.dataset.lightId] = cb.checked;
             });
             const newPorts = lightStatesToHexPorts(currentLightStates);
+            Object.assign(movement, newPorts);
+            updateVisualizer();
             
-            // Actualizar el objeto del movimiento en el store
-            movement.portD = newPorts.portD;
-            movement.portE = newPorts.portE;
-            movement.portF = newPorts.portF;
-            movement.portH = newPorts.portH;
-            movement.portJ = newPorts.portJ;
+            // Si es una luz verde o roja, actualizamos las restricciones
+            if (checkbox.dataset.lightId.startsWith('V') || checkbox.dataset.lightId.startsWith('R')) {
+                updateConflictRestraints(editorPanel);
+            }
+
+            
         });
     });
+    
+    // --- LLAMADA INICIAL PARA VALIDACIÓN ---
+    // Verificamos el estado al cargar el editor por primera vez.
+    const hasConflict = updateConflictRestraints(editorPanel);
+    const warningContainer = document.getElementById('conflict-warning-container');
+    if (hasConflict) {
+        warningContainer.innerHTML = `<div class="conflict-warning"><strong>Advertencia:</strong> Este movimiento tiene un conflicto de luces verdes según la matriz actual. Por favor, corríjalo.</div>`;
+    } else {
+        warningContainer.innerHTML = '';
+    }
 }
 
 // --- Lógica de Manejo de Datos (Añadir, Eliminar) ---
-
 function handleAddSequence() {
     const hardware = getProjectData().hardware_config;
-    // Encontrar el ID más alto existente y sumarle 1
     const nextId = hardware.sequences.reduce((max, seq) => Math.max(max, seq.id), -1) + 1;
-    hardware.sequences.push({ id: nextId, type: 0, anchor_pos: 0, movements: [] });
+    
+    // --- MODIFICACIÓN AQUÍ ---
+    // Añadimos el campo "type: 0" para definirla como Automática por defecto.
+    const newSequence = { 
+        id: nextId, 
+        type: 0, // 0 = SEQUENCE_TYPE_AUTOMATIC
+        anchor_pos: 0, 
+        movements: [] 
+    };
+    hardware.sequences.push(newSequence);
+    
     renderSequenceList();
 }
 
@@ -643,66 +659,65 @@ function handleAddMovement(seqId) {
 }
 
 function handleDeleteSequence(seqId) {
-    if (!confirm(`¿Estás seguro de que quieres eliminar la Secuencia ${seqId}? Se eliminarán todos sus movimientos y se quitará de cualquier plan que la use.`)) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar la Secuencia ${seqId}? Los movimientos que no se usen en otras secuencias también serán eliminados.`)) {
         return;
     }
 
     const data = getProjectData();
-    const sequence = data.hardware_config.sequences.find(s => s.id === seqId);
-    if (!sequence) return;
+    const hardware = data.hardware_config;
+    const seqIndex = hardware.sequences.findIndex(s => s.id === seqId);
 
-    // 1. Eliminar los movimientos asociados a esta secuencia de la lista global
-    sequence.movements.forEach(movId => {
-        const movIndex = data.hardware_config.movements.findIndex(m => m.id === movId);
-        if (movIndex > -1) {
-            data.hardware_config.movements.splice(movIndex, 1);
+    if (seqIndex === -1) return;
+
+    // 1. Guardamos los movimientos de la secuencia que vamos a eliminar.
+    const movementsToCheck = [...hardware.sequences[seqIndex].movements];
+
+    // 2. Eliminamos la secuencia de la lista.
+    hardware.sequences.splice(seqIndex, 1);
+
+    // 3. Hacemos la "recolección de basura" de movimientos huérfanos.
+    movementsToCheck.forEach(movId => {
+        // Buscamos si el movimiento todavía es usado por ALGUNA de las secuencias restantes.
+        const isMovementUsed = hardware.sequences.some(seq => seq.movements.includes(movId));
+
+        // Si el movimiento ya no se usa en ningún lado, lo eliminamos de la lista global.
+        if (!isMovementUsed) {
+            const movIndex = hardware.movements.findIndex(m => m.id === movId);
+            if (movIndex > -1) {
+                hardware.movements.splice(movIndex, 1);
+            }
         }
     });
 
-    // 2. Eliminar la secuencia de la lista de secuencias
-    const seqIndex = data.hardware_config.sequences.findIndex(s => s.id === seqId);
-    if (seqIndex > -1) {
-        data.hardware_config.sequences.splice(seqIndex, 1);
-    }
-    
-    // 3. (Opcional pero recomendado) Quitar la secuencia de los planes que la usen
-    data.hardware_config.plans.forEach(plan => {
-        if (plan.sequence_id === seqId) {
-            // Podríamos poner un valor por defecto como 0 o 255 si el hardware lo soporta
-            plan.sequence_id = 0; 
-        }
-    });
-
-    // 4. Limpiar el editor y volver a renderizar la lista
+    // 4. Limpiamos los paneles de la derecha y redibujamos la lista actualizada.
     document.getElementById('movement-editor-panel').innerHTML = '<p class="placeholder-text">Seleccione un movimiento de la lista para comenzar a editar.</p>';
+    document.getElementById('sequence-visualizer-container').style.display = 'none';
     renderSequenceList();
 }
 
 function handleDeleteMovement(seqId, movId) {
-    if (!confirm(`¿Estás seguro de que quieres eliminar el Movimiento ${movId}? Se quitará de la Secuencia ${seqId}.`)) {
+    // Se usa window.confirm para asegurar compatibilidad
+    if (!window.confirm(`¿Estás seguro de que quieres quitar el Movimiento ${movId} de la Secuencia ${seqId}?`)) {
         return;
     }
 
     const data = getProjectData();
-    
-    // 1. Quitar el movimiento de la secuencia
     const sequence = data.hardware_config.sequences.find(s => s.id === seqId);
+
     if (sequence) {
-        sequence.movements = sequence.movements.filter(id => id !== movId);
+        const index = sequence.movements.indexOf(movId);
+        if (index > -1) {
+            sequence.movements.splice(index, 1);
+        }
     }
 
-    // 2. Eliminar el movimiento de la lista global de movimientos
-    const movIndex = data.hardware_config.movements.findIndex(m => m.id === movId);
-    if (movIndex > -1) {
-        data.hardware_config.movements.splice(movIndex, 1);
-    }
-
-    // 3. Limpiar el editor y volver a renderizar la lista
+    // Limpiamos los paneles de la derecha.
     document.getElementById('movement-editor-panel').innerHTML = '<p class="placeholder-text">Seleccione un movimiento de la lista para comenzar a editar.</p>';
+    document.getElementById('sequence-visualizer-container').style.display = 'none';
+
+    // Volvemos a dibujar la lista para que el cambio se refleje.
     renderSequenceList();
 }
-
-
 // --- FUNCIONES AUXILIARES DE CONVERSIÓN (HEX <-> ESTADOS DE LUZ) ---
 
 /**
@@ -745,3 +760,290 @@ function lightStatesToHexPorts(states) {
         portJ: ports.portJ.toString(16).padStart(2, '0').toUpperCase(),
     };
 }
+
+
+// =================================================================================
+// --- INICIO: AÑADE ESTA NUEVA FUNCIÓN AQUÍ ---
+// =================================================================================
+
+/**
+ * Obtiene el estado (rojo, ámbar, verde) para un grupo semafórico específico dentro de un movimiento.
+ * @param {object} movement - El objeto del movimiento.
+ * @param {number} groupNumber - El número del grupo (1-8).
+ * @returns {object} Un objeto como { red: true, amber: false, green: false }.
+ */
+function getGroupStatus(movement, groupNumber) {
+    // Mapeo local de qué luces pertenecen a cada grupo
+    const GROUP_LIGHTS = {
+        1: ['R1', 'A1', 'V1'], 2: ['R2', 'A2', 'V2'],
+        3: ['R3', 'A3', 'V3'], 4: ['R4', 'A4', 'V4'],
+        5: ['R5', 'A5', 'V5'], 6: ['R6', 'A6', 'V6'],
+        7: ['R7', 'A7', 'V7'], 8: ['R8', 'A8', 'V8']
+    };
+    
+    const lights = GROUP_LIGHTS[groupNumber];
+    if (!lights) return { red: false, amber: false, green: false };
+
+    const status = { red: false, amber: false, green: false };
+    const lightStates = hexPortsToLightStates(movement); // Usamos la función que ya existe
+
+    lights.forEach(lightName => {
+        if (lightName.startsWith('R')) status.red = !!lightStates[lightName];
+        else if (lightName.startsWith('A')) status.amber = !!lightStates[lightName];
+        else if (lightName.startsWith('V')) status.green = !!lightStates[lightName];
+    });
+    
+    return status;
+}
+
+/**
+ * Actualiza las restricciones de los checkboxes según todos los conflictos definidos
+ * (Rojo/Verde en el mismo grupo y Verde/Verde según la matriz).
+ * @param {HTMLElement} editorPanel - El elemento contenedor del editor de movimiento.
+ * @returns {boolean} - Devuelve true si se encontró un conflicto preexistente.
+ */
+function updateConflictRestraints(editorPanel) {
+    const conflictMatrix = getProjectData().software_config.intersection.conflict_matrix;
+    const allCheckboxes = editorPanel.querySelectorAll('input[type="checkbox"]');
+    
+    // --- PASO 1: RESTABLECER ESTADO ---
+    // Habilitamos todas las casillas para empezar la validación desde cero.
+    allCheckboxes.forEach(cb => {
+        cb.disabled = false;
+        cb.closest('.light-control').classList.remove('disabled');
+    });
+
+    // --- PASO 2: APLICAR CONFLICTO INTERNO ROJO/VERDE ---
+    for (let i = 1; i <= 8; i++) {
+        const redCheckbox = editorPanel.querySelector(`#light-check-R${i}`);
+        const greenCheckbox = editorPanel.querySelector(`#light-check-V${i}`);
+
+        if (redCheckbox && greenCheckbox) {
+            if (redCheckbox.checked) {
+                greenCheckbox.disabled = true;
+                greenCheckbox.closest('.light-control').classList.add('disabled');
+            } else if (greenCheckbox.checked) {
+                redCheckbox.disabled = true;
+                redCheckbox.closest('.light-control').classList.add('disabled');
+            }
+        }
+    }
+
+    // --- PASO 3: APLICAR CONFLICTO DE MATRIZ VERDE/VERDE ---
+    const greenCheckboxes = editorPanel.querySelectorAll('input[data-light-id^="V"]');
+    const activeGreenGroups = [];
+    greenCheckboxes.forEach(cb => {
+        if (cb.checked) {
+            const groupIndex = parseInt(cb.dataset.lightId.replace('V', ''), 10) - 1;
+            activeGreenGroups.push(groupIndex);
+        }
+    });
+
+    const conflictingGroups = new Set();
+    activeGreenGroups.forEach(groupIndex => {
+        conflictMatrix[groupIndex].forEach((hasConflict, otherGroupIndex) => {
+            if (hasConflict) {
+                conflictingGroups.add(otherGroupIndex);
+            }
+        });
+    });
+
+    greenCheckboxes.forEach(cb => {
+        const groupIndex = parseInt(cb.dataset.lightId.replace('V', ''), 10) - 1;
+        if (conflictingGroups.has(groupIndex) && !activeGreenGroups.includes(groupIndex)) {
+            cb.disabled = true;
+            cb.closest('.light-control').classList.add('disabled');
+        }
+    });
+    
+    // --- PASO 4: VERIFICAR CONFLICTOS PREEXISTENTES ---
+    for (let i = 0; i < activeGreenGroups.length; i++) {
+        for (let j = i + 1; j < activeGreenGroups.length; j++) {
+            if (conflictMatrix[activeGreenGroups[i]][activeGreenGroups[j]]) {
+                return true; // Conflicto de matriz encontrado
+            }
+        }
+    }
+    
+    return false; // No se encontraron conflictos
+}
+
+// =================================================================================
+// --- INICIO: NUEVAS FUNCIONES AÑADIDAS ---
+// =================================================================================
+
+/**
+ * Dibuja la línea de tiempo completa para una secuencia seleccionada.
+ * @param {number} seqId - El ID de la secuencia a visualizar.
+ * @param {number} timeIndex - El índice del tiempo (0-4) a utilizar para las duraciones.
+ */
+function renderSequenceVisualizer(seqId, timeIndex) {
+    const hardware = getProjectData().hardware_config;
+    const sequence = hardware.sequences.find(s => s.id === seqId);
+    const visualizerContainer = document.getElementById('sequence-visualizer-container');
+
+    if (!sequence || sequence.movements.length === 0) {
+        visualizerContainer.style.display = 'none';
+        return;
+    }
+
+    const cycleMovements = sequence.movements.map(movId => hardware.movements.find(m => m.id === movId)).filter(Boolean);
+    const totalCycleTime = cycleMovements.reduce((total, mov) => total + (mov.times[timeIndex] || 0), 0);
+
+    visualizerContainer.style.display = 'block';
+    visualizerContainer.innerHTML = `
+        <div class="sequence-visualizer-header">
+            <h5>Visualización de Secuencia ${seqId}</h5>
+            <div class="visualizer-controls">
+                <label for="visualizer-time-select">Índice de Tiempo:</label>
+                <select id="visualizer-time-select">
+                    <option value="0" ${timeIndex === 0 ? 'selected' : ''}>T0</option>
+                    <option value="1" ${timeIndex === 1 ? 'selected' : ''}>T1</option>
+                    <option value="2" ${timeIndex === 2 ? 'selected' : ''}>T2</option>
+                    <option value="3" ${timeIndex === 3 ? 'selected' : ''}>T3</option>
+                    <option value="4" ${timeIndex === 4 ? 'selected' : ''}>T4</option>
+                </select>
+                <span><b>Ciclo Total:</b> ${totalCycleTime}s</span>
+            </div>
+        </div>
+        <div class="timeline-wrapper" id="sequence-timeline-wrapper">
+            <div class="timeline-grid-container" id="sequence-timeline-grid"></div>
+        </div>
+    `;
+
+    const gridContainer = document.getElementById('sequence-timeline-grid');
+    if (totalCycleTime > 0) {
+        // --- Lógica de dibujado CORREGIDA ---
+        let gridHTML = '';
+
+        // 1. Fondo con la rejilla (ahora parte del string HTML)
+        const majorTickInterval = totalCycleTime > 100 ? 10 : (totalCycleTime > 30 ? 5 : 2);
+        const backgroundStyle = `
+            background-image: 
+                repeating-linear-gradient(to right, #f0f0f0, #f0f0f0 1px, transparent 1px, transparent calc(${100/totalCycleTime}%)),
+                repeating-linear-gradient(to right, #ccc, #ccc 1px, transparent 1px, transparent calc(${majorTickInterval*100/totalCycleTime}%));
+        `;
+        gridHTML += `<div class="timeline-bars-area" style="${backgroundStyle}"></div>`;
+
+        // 2. Cabeceras y etiquetas de Etapa
+        gridHTML += `
+            <div class="grid-cell header grid-label">Etapa</div>
+            <div class="grid-cell header timeline-stages-content">
+        `;
+        let accumulatedTime = 0;
+        cycleMovements.forEach(mov => {
+            const duration = mov.times[timeIndex] || 0;
+            if (duration > 0) {
+                const startPercent = (accumulatedTime / totalCycleTime) * 100;
+                const widthPercent = (duration / totalCycleTime) * 100;
+                gridHTML += `
+                    <div class="stage-separator" style="left: ${startPercent}%;"></div>
+                    <span class="stage-label" style="left: ${startPercent + (widthPercent / 2)}%;">Mov. ${mov.id}</span>
+                `;
+                accumulatedTime += duration;
+            }
+        });
+        gridHTML += '</div>';
+
+        // 3. Barras de los grupos semafóricos
+        for (let i = 1; i <= 8; i++) {
+            gridHTML += `<div class="grid-cell grid-label">G${i}</div><div class="grid-cell timeline-bar-container">`;
+            cycleMovements.forEach(mov => {
+                const duration = mov.times[timeIndex] || 0;
+                if (duration === 0) return;
+                
+                const status = getGroupStatus(mov, i);
+                let colorClass = 'gray';
+                if (Object.values(status).filter(Boolean).length > 1) colorClass = 'violet';
+                else if (status.green) colorClass = 'green';
+                else if (status.amber) colorClass = 'amber';
+                else if (status.red) colorClass = 'red';
+                
+                const widthPercent = (duration / totalCycleTime) * 100;
+                gridHTML += `<div class="timeline-segment ${colorClass}" style="width: ${widthPercent}%" title="G${i}, Mov ${mov.id}, ${duration}s"></div>`;
+            });
+            gridHTML += `</div>`;
+        }
+
+        // 4. Se asigna todo el HTML al contenedor de una sola vez
+        gridContainer.innerHTML = gridHTML;
+    }
+
+    // El listener para el selector de tiempo
+    document.getElementById('visualizer-time-select').addEventListener('change', (e) => {
+        renderSequenceVisualizer(seqId, parseInt(e.target.value, 10));
+    });
+}
+/**
+ * Inicializa los listeners y la lógica para el modal de añadir movimiento.
+ */
+function setupAddMovementModal() {
+    const modal = document.getElementById('add-movement-modal');
+    if (!modal) return;
+    
+    let currentSeqId = null;
+
+    const showModal = (seqId) => {
+        currentSeqId = seqId;
+        document.getElementById('modal-title').textContent = `Añadir Movimiento a Secuencia ${seqId}`;
+        document.getElementById('modal-step-1').style.display = 'block';
+        document.getElementById('modal-step-2').style.display = 'none';
+        modal.classList.add('visible');
+    };
+
+    const hideModal = () => modal.classList.remove('visible');
+
+    document.getElementById('modal-btn-cancel').addEventListener('click', hideModal);
+
+    document.getElementById('modal-btn-new').addEventListener('click', () => {
+        const hardware = getProjectData().hardware_config;
+        const nextMovId = hardware.movements.reduce((max, mov) => Math.max(max, mov.id), -1) + 1;
+        const newMovement = { id: nextMovId, portD: '00', portE: '00', portF: '00', portH: '00', portJ: '00', times: [3, 3, 3, 3, 3] }; // Tiempos por defecto
+        hardware.movements.push(newMovement);
+        
+        const sequence = hardware.sequences.find(s => s.id === currentSeqId);
+        sequence.movements.push(nextMovId);
+        
+        hideModal();
+        renderSequenceList();
+        setTimeout(() => { document.querySelector(`.movement-item[data-mov-id="${nextMovId}"]`)?.click(); }, 100);
+    });
+
+    document.getElementById('modal-btn-existing').addEventListener('click', () => {
+        const hardware = getProjectData().hardware_config;
+        const sequence = hardware.sequences.find(s => s.id === currentSeqId);
+        const selector = document.getElementById('modal-select-movement');
+        selector.innerHTML = '';
+
+        const availableMovements = hardware.movements.filter(mov => !sequence.movements.includes(mov.id));
+        
+        if (availableMovements.length > 0) {
+            availableMovements.forEach(mov => {
+                selector.add(new Option(`Movimiento ${mov.id}`, mov.id));
+            });
+        } else {
+            selector.add(new Option('No hay movimientos disponibles para añadir', ''));
+        }
+        
+        document.getElementById('modal-step-1').style.display = 'none';
+        document.getElementById('modal-step-2').style.display = 'block';
+    });
+    
+    document.getElementById('modal-btn-add-selected').addEventListener('click', () => {
+        const movIdToAdd = parseInt(document.getElementById('modal-select-movement').value, 10);
+        if (isNaN(movIdToAdd)) return;
+
+        const sequence = getProjectData().hardware_config.sequences.find(s => s.id === currentSeqId);
+        sequence.movements.push(movIdToAdd);
+        
+        hideModal();
+        renderSequenceList();
+    });
+    
+    // Asignamos la función `showModal` a un objeto global temporal para que sea accesible desde otros listeners
+    window.showAddMovementModal = showModal;
+}
+
+// =================================================================================
+// --- FIN: NUEVAS FUNCIONES AÑADIDAS ---
+// =================================================================================
