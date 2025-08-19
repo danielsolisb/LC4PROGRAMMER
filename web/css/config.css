@@ -48,6 +48,7 @@
     overflow: hidden;
 }
 /* --- Layout de la Pestaña 2 --- */
+/* --- Layout de la Pestaña 2 --- */
 .sequences-layout {
     display: flex;
     gap: 20px;
@@ -55,7 +56,7 @@
 }
 
 .sequences-sidebar {
-    flex: 0 0 350px;
+    flex: 0 0 400px; /* Un poco más de espacio para la lista */
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -67,34 +68,143 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    overflow: hidden;
+    overflow-y: auto;
 }
-.sequence-list {
+
+/* Estilos para la lista de secuencias y movimientos */
+#sequence-list-container {
+    margin-bottom: 15px;
+}
+
+.sequence-block {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #fdfdfd;
+}
+
+.sequence-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.sequence-header h6 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.movement-list {
     list-style: none;
-    padding: 0;
+    padding-left: 15px;
     margin: 0;
 }
-.sequence-item {
-    padding: 5px;
-    border-bottom: 1px solid #e0e0e0;
+
+.movement-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 5px;
+    border-radius: 4px;
     cursor: pointer;
-}
-.sequence-item:hover {
-    background-color: #f0f0f0;
+    transition: background-color 0.2s;
 }
 
-.config-panel {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    padding: 15px;
-}
-.config-panel h5 {
-    margin-top: 0;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #ccc;
+.movement-item:hover {
+    background-color: #e9ecef;
 }
 
+.movement-item.active {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+}
+
+.delete-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+#add-sequence-btn {
+    width: 100%;
+}
+
+/* Estilos para el editor de movimiento */
+#movement-editor-panel .placeholder-text {
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    padding: 50px 0;
+}
+
+.movement-editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.times-editor, .lights-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.time-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.time-input-group label {
+    font-weight: bold;
+    min-width: 30px;
+}
+.time-input-group input {
+    width: 100%;
+}
+
+.lights-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 columnas para los grupos */
+    gap: 15px;
+    font-size: 0.9em;
+}
+
+.light-group {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.light-group-title {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.light-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.light-control input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+/* Colores para las etiquetas de las luces */
+.light-label-R { color: #c0392b; }
+.light-label-A { color: #f39c12; }
+.light-label-V { color: #27ae60; }
 /* --- Formulario de Propiedades y Feriados --- */
 .form-group { margin-bottom: 10px; }
 .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
@@ -194,4 +304,40 @@
 /* Opciones deshabilitadas en el selector de grupos por conflictos */
 .conflict-option {
     color: red;
+}
+
+
+
+/* --- Estilos para el Visualizador de Secuencia Completa --- */
+.sequence-visualizer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.sequence-visualizer-header h5 {
+    margin: 0;
+}
+.visualizer-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.visualizer-controls label {
+    font-weight: bold;
+}
+.visualizer-controls select {
+    padding: 5px;
+}
+
+#sequence-timeline-wrapper {
+    overflow-x: auto;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    padding: 5px;
+}
+#sequence-timeline-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    position: relative;
 }

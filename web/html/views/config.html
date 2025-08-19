@@ -63,17 +63,31 @@
 
     <!-- PESTAÑA 2: LÓGICA DE SECUENCIAS (Contenido futuro) -->
     <div id="tab-sequences" class="config-tab-content">
+    
+    <div class="sequences-layout">
         
-        <p>Contenido para la Lógica de Secuencias irá aquí.</p>
-        <div class="sequences-layout">
-            <div class="sequences-sidebar">
-                <!-- La lista de secuencias y movimientos se generará aquí -->
-            </div>
-            <div id="movement-editor" class="sequences-main">
-                <!-- El formulario de edición/creación de movimientos aparecerá aquí -->
+        <div class="sequences-sidebar">
+            <div class="config-panel">
+                <h5>Secuencias y Movimientos</h5>
+                <div id="sequence-list-container">
+                    </div>
+                <button id="add-sequence-btn" class="tool-btn">Añadir Nueva Secuencia</button>
             </div>
         </div>
+
+        <div id="movement-editor-container" class="sequences-main">
+            <div class="config-panel" id="movement-editor-panel">
+                <p class="placeholder-text">Seleccione un movimiento de la lista para comenzar a editar.</p>
+            </div>
+            <div class="config-panel" id="sequence-visualizer-container" style="display: none;">
+                </div>
+            </div>
+        </div>
+        
+
     </div>
+
+</div>
 
     <!-- PESTAÑA 3: PROGRAMACIÓN Y AGENDA (Contenido futuro) -->
     <div id="tab-scheduling" class="config-tab-content">

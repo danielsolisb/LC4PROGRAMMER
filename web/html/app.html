@@ -6,12 +6,8 @@
     <title>LC4 Programmer</title>
     <link rel="stylesheet" href="/web/css/style.css">
 
-    <!-- ======================================================= -->
-    <!-- NUEVO: Añadir las librerías del mapa aquí -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- ======================================================= -->
-
-</head>
+    <link rel="stylesheet" href="/web/lib/leaflet/leaflet.css" />
+    </head>
 <body>
     <div class="app-container">
         <aside class="sidebar">
@@ -24,7 +20,7 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="#" id="nav-dashboard" class="active" onclick="loadView('dashboard')">Dashboard</a>
-                <a href="#" id="nav-sequences" onclick="loadView('sequences')">Editor de Secuencias</a>
+                <a href="#" id="nav-sequences" onclick="loadView('sequences')">Editor de Secuencias</a> 
                 <a href="#" id="nav-plans" onclick="loadView('plans')">Programador de Planes</a>
                 <a href="#" id="nav-config" onclick="loadView('config')">Configuración</a>
                 <a href="#" id="nav-monitoring" onclick="loadView('monitoring')">Monitoreo en Tiempo Real</a>
@@ -41,10 +37,8 @@
         </aside>
 
         <main id="main-content-area" class="main-content">
-            <!-- El contenido de las vistas se carga aquí -->
-        </main>
+            </main>
     </div>
-    <!-- Modal de Carga -->
     <div id="loading-modal" class="loading-modal-overlay">
         <div class="loading-modal-content">
             <div class="spinner"></div>
@@ -52,12 +46,33 @@
         </div>
     </div>
 
-    <!-- ======================================================= -->
-    <!-- NUEVO: Añadir los scripts del mapa aquí, ANTES de app.js -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js"></script>
-    <!-- ======================================================= -->
+    <script src="/web/lib/leaflet/leaflet.js"></script>
+    <script src="/web/lib/leaflet/leaflet.rotatedMarker.min.js"></script>
+    <script type="module" src="/web/js/app.js"></script>
 
+    
+    <div id="add-movement-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h4 id="modal-title">Añadir Movimiento a Secuencia X</h4>
+            <div id="modal-step-1">
+                <p>¿Qué deseas hacer?</p>
+                <div class="modal-options">
+                    <button id="modal-btn-new">Crear Movimiento Nuevo</button>
+                    <button id="modal-btn-existing">Añadir Movimiento Existente</button>
+                </div>
+            </div>
+            <div id="modal-step-2" style="display: none;">
+                <p>Selecciona un movimiento de la lista para añadirlo a la secuencia.</p>
+                <select id="modal-select-movement"></select>
+                <div class="modal-actions">
+                    <button id="modal-btn-add-selected">Añadir Seleccionado</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
     <script type="module" src="/web/js/app.js"></script>
 </body>
 </html>

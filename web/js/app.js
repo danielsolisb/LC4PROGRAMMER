@@ -17,7 +17,7 @@ import { initializeConfigView } from './views/config.js';
  */
 async function loadView(viewName, forceReload = false) {
     const mainContent = document.getElementById('main-content-area');
-    
+
     // Limpia la vista de monitoreo anterior si se cambia de vista
     if (mainContent.dataset.currentView === 'monitoring' && viewName !== 'monitoring') {
         await cleanupMonitoringView();
@@ -26,24 +26,25 @@ async function loadView(viewName, forceReload = false) {
     if (mainContent.dataset.currentView === viewName && !forceReload) return;
 
     try {
-        const response = await fetch(`/web/html/views/${viewName}.html`);
+        // Si intentamos cargar la vista 'sequences', redirigimos a 'config'
+        const viewToLoad = viewName === 'sequences' ? 'config' : viewName;
+
+        const response = await fetch(`/web/html/views/${viewToLoad}.html`);
         if (!response.ok) throw new Error(`Error al cargar HTML de la vista: ${response.status}`);
-        
+
         mainContent.innerHTML = await response.text();
-        mainContent.dataset.currentView = viewName;
+        mainContent.dataset.currentView = viewToLoad;
 
         // Activa el enlace de navegación correcto
         document.querySelectorAll('.sidebar-nav a').forEach(link => link.classList.remove('active'));
-        document.getElementById(`nav-${viewName}`).classList.add('active');
+        document.getElementById(`nav-${viewName}`).classList.add('active'); // Mantenemos el enlace original activo
 
         // Llama a la función de inicialización específica de la vista
-        switch (viewName) {
+        switch (viewToLoad) {
             case 'dashboard':
                 initializeDashboardView();
                 break;
-            case 'sequences':
-                initializeSequencesView();
-                break;
+            // ELIMINADO: El caso 'sequences' ya no es necesario
             case 'plans':
                 initializePlansView();
                 break;
@@ -55,6 +56,12 @@ async function loadView(viewName, forceReload = false) {
                 break;
             case 'config':
                 initializeConfigView();
+                // Si venimos del enlace 'sequences', abrimos la pestaña correcta
+                if (viewName === 'sequences') {
+                    setTimeout(() => {
+                        document.querySelector('.config-tab[data-tab="tab-sequences"]').click();
+                    }, 100);
+                }
                 break;
         }
     } catch (error) {
@@ -62,7 +69,6 @@ async function loadView(viewName, forceReload = false) {
         mainContent.innerHTML = `<div class="main-header"><h2>Error</h2></div><p>No se pudo cargar la sección solicitada.</p>`;
     }
 }
-
 /**
  * Flujo de trabajo para capturar datos del controlador.
  */
