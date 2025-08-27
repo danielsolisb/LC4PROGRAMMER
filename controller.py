@@ -3,7 +3,7 @@
 import re
 import json
 from communicator import Communicator
-
+import time
 # --- Constantes actualizadas ---
 MAX_MOVEMENTS = 60
 MAX_SEQUENCES = 8
@@ -100,96 +100,113 @@ class Controller:
             'software_config': {}
         }
 
-    def _parse_id_response(self, response: dict) -> str:
-        if response.get('status') == 'success' and response.get('data'):
-            try:
-                return response.get('data').split(':')[1].strip()
-            except (IndexError, AttributeError):
-                return "Formato Inválido"
+    def _parse_id_response(self, response_payload: bytes | None) -> str:
+        # Payload: [ID] (1 byte)
+        if response_payload:
+            # response_payload[0] es el valor numérico del byte.
+            # f"{...:02X}" lo formatea como un string hexadecimal de dos caracteres.
+            return f"{response_payload[0]:02X}"
         return "N/A"
 
-    def _parse_time_response(self, response: dict) -> tuple[str, str]:
-        if response.get('status') == 'success' and response.get('data'):
-            try:
-                parts = response.get('data').split(' - ')
-                time_str = parts[0].replace('Hora: ', '').strip()
-                date_str = parts[1].split('(')[0].replace('Fecha: ', '').strip()
-                return date_str, time_str
-            except (IndexError, AttributeError):
-                return "Formato Inválido", "Formato Inválido"
-        return "N/A", "N/A"
 
-    def _parse_movement_response(self, response_text: str) -> dict | None:
-        if "no existe" in response_text: return None
-        match = re.search(r"Movimiento\[(\d+)]: D:(\w+) E:(\w+) F:(\w+) H:(\w+) J:(\w+) T:\[([\w\s]+)\]", response_text)
-        if match:
-            times_str = match.group(7).split()
+    def _parse_time_response(self, response_payload: bytes | None) -> tuple[str, str]:
+        # Payload: [HH, MM, SS, DD, MM, YY, DoW] (7 bytes)
+        if response_payload and len(response_payload) == 7:
+            h, m, s, day, mon, year, dow = response_payload
+            time_str = f"{h:02d}:{m:02d}:{s:02d}"
+            date_str = f"{day:02d}/{mon:02d}/20{year:02d}" # Asumimos años 20xx
+            return date_str, time_str
+        return "Formato Inválido", "Formato Inválido"
+
+    def _parse_movement_response(self, response_payload: bytes) -> dict | None:
+        # Payload: [Index, D, E, F, H, J, T0, T1, T2, T3, T4] (11 bytes)
+        if len(response_payload) == 11:
+            
+            # --- INICIO DE LA SOLUCIÓN ---
+            # Un slot de movimiento vacío en la EEPROM usualmente se lee como 0xFF.
+            # Si el primer byte de los puertos es 0xFF, consideramos que es un
+            # movimiento inválido o "fantasma" y lo descartamos devolviendo None.
+            portD_value = response_payload[1]
+            if portD_value == 0xFF:
+                return None # Descartar este movimiento
+            # --- FIN DE LA SOLUCIÓN ---
+
             return {
-                'id': int(match.group(1)), 'portD': match.group(2), 'portE': match.group(3),
-                'portF': match.group(4), 'portH': match.group(5), 'portJ': match.group(6),
-                'times': [int(t, 16) for t in times_str]
+                'id': response_payload[0],
+                'portD': f"{response_payload[1]:02X}",
+                'portE': f"{response_payload[2]:02X}",
+                'portF': f"{response_payload[3]:02X}",
+                'portH': f"{response_payload[4]:02X}",
+                'portJ': f"{response_payload[5]:02X}",
+                'times': list(response_payload[6:])
             }
         return None
 
-    def _parse_sequence_response(self, response_text: str) -> dict | None:
-        if "no existe" in response_text: return None
-        match = re.search(r"Sec\[(\d+)]: TIPO:(\d+) ANCLA_POS:(\d+) MOV:([\d\s]*)", response_text)
-        if match:
-            mov_indices_str = match.group(4).strip()
-            mov_indices = [int(i) for i in mov_indices_str.split()] if mov_indices_str else []
+    def _parse_sequence_response(self, response_payload: bytes) -> dict | None:
+        # Payload: [Index, Tipo, Ancla_Pos, Num_Mov, Mov_0, ..., Mov_11] (16 bytes)
+        if len(response_payload) == 16:
+            num_movements = response_payload[3]
+            movements = list(response_payload[4:4+num_movements])
             return {
-                'id': int(match.group(1)), 'type': int(match.group(2)),
-                'anchor_pos': int(match.group(3)), 'movements': mov_indices
+                'id': response_payload[0],
+                'type': response_payload[1],
+                'anchor_pos': response_payload[2],
+                'movements': movements
             }
         return None
 
-    def _parse_plan_response(self, response_text: str) -> dict | None:
-        # El firmware devuelve 255 para slots vacíos, los filtramos aquí.
-        if "no existe" in response_text or "TipoDia:255" in response_text: return None
-        match = re.search(r"Plan\[(\d+)]: TipoDia:(\d+), Sec:(\d+), Tsel:(\d+), Hora:(\d+), Min:(\d+)", response_text)
-        if match:
+    def _parse_plan_response(self, response_payload: bytes) -> dict | None:
+        # Payload: [Index, TipoDia, Sec, Tsel, Hora, Min] (6 bytes)
+        if len(response_payload) == 6:
             return {
-                'id': int(match.group(1)), 'day_type_id': int(match.group(2)),
-                'sequence_id': int(match.group(3)), 'time_sel': int(match.group(4)),
-                'hour': int(match.group(5)), 'minute': int(match.group(6))
+                'id': response_payload[0],
+                'day_type_id': response_payload[1],
+                'sequence_id': response_payload[2],
+                'time_sel': response_payload[3],
+                'hour': response_payload[4],
+                'minute': response_payload[5]
             }
         return None
 
-    # --- INICIO DE NUEVOS MÉTODOS DE PARSEO ---
-
-    def _parse_intermittence_response(self, response_text: str) -> dict | None:
-        if "no existe" in response_text: return None
-        match = re.search(r"Intermitencia\[(\d+)]: PlanID:(\d+) MovID:(\d+) MaskD:0x(\w+) MaskE:0x(\w+) MaskF:0x(\w+)", response_text)
-        if match:
+    def _parse_intermittence_response(self, response_payload: bytes) -> dict | None:
+        # Payload: [Index, PlanID, MovID, MaskD, MaskE, MaskF] (6 bytes)
+        if len(response_payload) == 6:
             return {
-                'id': int(match.group(1)), 'plan_id': int(match.group(2)),
-                'movement_id': int(match.group(3)), 'maskD': match.group(4),
-                'maskE': match.group(5), 'maskF': match.group(6)
+                'id': response_payload[0],
+                'id_plan': response_payload[1], # Corregido para que coincida con el frontend
+                'indice_mov': response_payload[2], # Corregido para que coincida con el frontend
+                'maskD': f"{response_payload[3]:02X}",
+                'maskE': f"{response_payload[4]:02X}",
+                'maskF': f"{response_payload[5]:02X}"
             }
         return None
 
-    def _parse_flow_rule_response(self, response_text: str) -> dict | None:
-        if "no existe" in response_text: return None
-        match = re.search(r"Regla\[(\d+)]: Sec:(\d+) MovOrig:(\d+) Tipo:(\d+) Mascara:0x(\w+) MovDest:(\d+)", response_text)
-        if match:
+
+    def _parse_flow_rule_response(self, response_payload: bytes) -> dict | None:
+        # Payload: [Index, Sec, MovOrig, Tipo, Mascara, MovDest] (6 bytes)
+        if len(response_payload) == 6:
             return {
-                'id': int(match.group(1)), 'sequence_id': int(match.group(2)),
-                'origin_mov_id': int(match.group(3)), 'rule_type': int(match.group(4)),
-                'demand_mask': match.group(5), 'destination_mov_id': int(match.group(6))
+                'id': response_payload[0],
+                'sequence_id': response_payload[1],
+                'origin_mov_id': response_payload[2],
+                'rule_type': response_payload[3],
+                'demand_mask': response_payload[4],
+                'destination_mov_id': response_payload[5]
             }
         return None
         
-    def _parse_all_holidays_response(self, response_text: str) -> list:
-        """Parsea la respuesta multilínea del comando de leer feriados."""
+    def _parse_all_holidays_response(self, response_payload: bytes) -> list:
+        # Payload: [ID, Dia, Mes, ID, Dia, Mes, ...] (N * 3 bytes)
         holidays = []
-        # Buscamos todas las coincidencias de la línea de un feriado
-        matches = re.finditer(r"Slot\[(\d+)]: (\d+)/(\d+)", response_text)
-        for match in matches:
-            holidays.append({
-                'id': int(match.group(1)),
-                'day': int(match.group(2)),
-                'month': int(match.group(3))
-            })
+        chunk_size = 3
+        for i in range(0, len(response_payload), chunk_size):
+            chunk = response_payload[i:i+chunk_size]
+            if len(chunk) == chunk_size:
+                holidays.append({
+                    'id': chunk[0],
+                    'day': chunk[1],
+                    'month': chunk[2]
+                })
         return holidays
 
     # --- FIN DE NUEVOS MÉTODOS DE PARSEO ---
@@ -201,7 +218,8 @@ class Controller:
         for i in range(max_items):
             payload = bytes([i])
             response = self._comm.send_command(read_cmd, data_payload=payload)
-            if response.get('status') == 'success' and response.get('data'):
+            # Si el comando fue exitoso (no NACK), procesamos el payload.
+            if response.get('status') == 'success':
                 parsed_item = parser_func(response['data'])
                 if parsed_item:
                     items.append(parsed_item)
@@ -212,10 +230,9 @@ class Controller:
     def _fetch_all_holidays(self) -> list:
         """Función específica para capturar todos los feriados con un solo comando."""
         print("CONTROLLER: Capturando feriados...")
-        # El comando 0x61 no necesita payload
         response = self._comm.send_command(0x61)
         items = []
-        if response.get('status') == 'success' and response.get('data'):
+        if response.get('status') == 'success':
             items = self._parse_all_holidays_response(response['data'])
         print(f"CONTROLLER: Capturados {len(items)} feriados.")
         return items
@@ -230,15 +247,17 @@ class Controller:
         # Información básica
         id_response = self._comm.send_command(0x11)
         time_response = self._comm.send_command(0x21)
-        controller_id = self._parse_id_response(id_response)
-        date_str, time_str = self._parse_time_response(time_response)
+        
+        # --- INICIO DE LA CORRECCIÓN ---
+        # Extraemos el campo 'data' del diccionario de respuesta ANTES de pasarlo al parser.
+        controller_id = self._parse_id_response(id_response.get('data'))
+        date_str, time_str = self._parse_time_response(time_response.get('data'))
+        # --- FIN DE LA CORRECCIÓN ---
 
-        # Captura de todas las tablas de datos
+        # Captura de todas las tablas de datos (esta parte ya estaba bien)
         movements = self._fetch_all_items("movimientos", MAX_MOVEMENTS, 0x24, self._parse_movement_response)
         sequences = self._fetch_all_items("secuencias", MAX_SEQUENCES, 0x31, self._parse_sequence_response)
         plans = self._fetch_all_items("planes", MAX_PLANS, 0x41, self._parse_plan_response)
-        
-        # --- NUEVAS LLAMADAS ---
         intermittences = self._fetch_all_items("intermitencias", MAX_INTERMITENCES, 0x51, self._parse_intermittence_response)
         holidays = self._fetch_all_holidays()
         flow_rules = self._fetch_all_items("reglas de flujo", MAX_FLOW_CONTROL_RULES, 0x71, self._parse_flow_rule_response)
@@ -254,8 +273,6 @@ class Controller:
             'flow_rules': flow_rules
         }
         print("CONTROLLER: Captura completa finalizada.")
-        # Para depuración, puedes imprimir el resultado completo
-        # print(json.dumps(self.project_data, indent=2))
 
     def get_dashboard_data(self) -> dict:
         """MODIFICADO: Devuelve datos desde la sub-estructura correcta."""
@@ -287,9 +304,16 @@ class Controller:
     def _send_write_command(self, command, payload):
         """Función auxiliar para enviar un comando de escritura y verificar el ACK."""
         response = self._comm.send_command(command, data_payload=payload)
-        # El ACK del firmware es el carácter 0x06
-        if response.get('status') == 'success' and response.get('data') == '\x06':
+        
+        if response.get('status') == 'success':
+            # --- INICIO DE LA CORRECCIÓN ---
+            # Agregamos una pequeña pausa DESPUÉS de recibir el ACK.
+            # Esto le da al firmware tiempo para completar la escritura en la EEPROM
+            # antes de que le enviemos el siguiente comando en el bucle.
+            time.sleep(0.05) # Pausa de 50 milisegundos, ajustable si es necesario.
+            # --- FIN DE LA CORRECCIÓN ---
             return True
+        
         print(f"Error: No se recibió ACK para el comando 0x{command:02X}. Respuesta: {response.get('data')}")
         return False
 
@@ -424,7 +448,6 @@ class Controller:
                 return {'status': 'error', 'message': f'Falló al escribir la regla de flujo {i}'}
         return {'status': 'success'}
 
-
     def upload_full_configuration(self, hardware_config):
         """
         Orquesta el proceso completo de subida de la configuración.
@@ -432,9 +455,10 @@ class Controller:
         """
         print("CONTROLLER: Iniciando subida de configuración completa...")
         
-        # El orden es importante. Primero subimos los datos base (movimientos)
-        # y luego los que dependen de ellos (secuencias, planes, etc.)
+        # --- INICIO DE LA CORRECCIÓN ---
+        # Añadimos el paso que faltaba para subir el ID del controlador.
         upload_steps = [
+            (self._upload_controller_id, hardware_config.get('info', {})),
             (self._upload_movements, hardware_config.get('movements', [])),
             (self._upload_sequences, hardware_config.get('sequences', [])),
             (self._upload_plans, hardware_config.get('plans', [])),
@@ -442,6 +466,7 @@ class Controller:
             (self._upload_holidays, hardware_config.get('holidays', [])),
             (self._upload_flow_rules, hardware_config.get('flow_rules', []))
         ]
+        # --- FIN DE LA CORRECCIÓN ---
 
         for uploader, data in upload_steps:
             result = uploader(data)
@@ -450,3 +475,38 @@ class Controller:
 
         print("CONTROLLER: Subida de configuración completada exitosamente.")
         return {'status': 'success', 'message': 'Configuración subida al controlador exitosamente.'}
+
+    
+    def _upload_controller_id(self, info_config):
+        """Sube el ID del controlador."""
+        print("CONTROLLER: Escribiendo ID del controlador...")
+        controller_id_str = info_config.get('controller_id', '0')
+        try:
+            # El firmware espera un byte. Convertimos el ID a un entero.
+            controller_id_byte = int(controller_id_str)
+            payload = bytes([controller_id_byte])
+            
+            # El comando para guardar el ID es 0x10.
+            if not self._send_write_command(0x10, payload):
+                return {'status': 'error', 'message': 'Falló al escribir el ID del controlador'}
+            return {'status': 'success'}
+        except (ValueError, TypeError):
+            return {'status': 'error', 'message': f'El ID del controlador "{controller_id_str}" no es un número válido.'}
+
+    def _upload_controller_id(self, info_config):
+        """Sube el ID del controlador."""
+        print("CONTROLLER: Escribiendo ID del controlador...")
+        # Extraemos el ID del diccionario 'info', si no existe, usamos '0'.
+        controller_id_str = info_config.get('controller_id', '0')
+        try:
+            # El firmware espera un número. Convertimos el ID a entero.
+            # El archivo .lc4 lo guarda como string, ej: "2".
+            controller_id_byte = int(controller_id_str) 
+            payload = bytes([controller_id_byte])
+            
+            # El comando para guardar el ID es 0x10.
+            if not self._send_write_command(0x10, payload):
+                return {'status': 'error', 'message': 'Falló al escribir el ID del controlador'}
+            return {'status': 'success'}
+        except (ValueError, TypeError):
+            return {'status': 'error', 'message': f'El ID del controlador "{controller_id_str}" no es un número válido.'}

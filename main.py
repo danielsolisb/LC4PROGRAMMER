@@ -230,17 +230,19 @@ class Api:
             return {'status': 'error', 'message': 'No hay conexión con el controlador.'}
         
         print("API: Enviando comando de Reseteo de Fábrica (0xF0)...")
-        # El payload es vacío para este comando.
         response = self._communicator.send_command(0xF0)
 
-        # El firmware responde con un ACK (0x06) en el campo 'data'.
-        # Lo verificamos para confirmar que el comando fue aceptado.
-        if response.get('status') == 'success' and response.get('data') == '\x06':
+        # --- INICIO DE LA CORRECCIÓN ---
+        # El comunicador ya verificó que la respuesta fue un ACK.
+        # Solo necesitamos comprobar si el estado general fue exitoso.
+        if response.get('status') == 'success':
+        # --- FIN DE LA CORRECCIÓN ---
             print("API: Reseteo de Fábrica confirmado por el controlador.")
             return {'status': 'success', 'message': 'El controlador ha sido restablecido a los valores de fábrica.'}
         else:
             print("API: Falló el comando de Reseteo de Fábrica.")
-            return {'status': 'error', 'message': 'El controlador no confirmó el reseteo.'}
+            # Pasamos el mensaje de error que nos dio el comunicador (ej. Timeout)
+            return {'status': 'error', 'message': response.get('message', 'El controlador no confirmó el reseteo.')}
 
     def upload_configuration(self, project_json):
         """Recibe los datos del frontend y orquesta la subida al controlador."""

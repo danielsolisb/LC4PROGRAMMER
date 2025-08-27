@@ -114,7 +114,8 @@ function renderPlanDetails(planId) {
         return;
     }
 
-    const intermittenceRule = hardwareData.intermittences.find(i => i.plan_id === plan.id);
+    const intermittenceRule = hardwareData.intermittences.find(i => i.id_plan === plan.id);
+    //const intermittenceRule = hardwareData.intermittences.find(i => i.plan_id === plan.id);
 
     // --- El resto del renderizado de la línea de tiempo y las tablas continúa aquí... ---
     // (Esta parte del código no necesita cambios)
