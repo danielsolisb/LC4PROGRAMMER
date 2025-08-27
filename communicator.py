@@ -57,7 +57,10 @@ class Communicator:
                 # --- INICIO DE LA SOLUCIÓN CORRECTA ---
                 # Pausa estratégica para dar tiempo al controlador a procesar,
                 # especialmente importante para comandos de escritura.
-                time.sleep(0.3)
+                if cmd_byte in WRITE_COMMANDS:
+                    time.sleep(0.3)
+                else:
+                    time.sleep(0.08)
                 # --- FIN DE LA SOLUCIÓN CORRECTA ---
 
                 if self.ser.in_waiting > 0:
