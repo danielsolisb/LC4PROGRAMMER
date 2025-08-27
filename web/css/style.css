@@ -433,3 +433,34 @@ body, html {
 #modal-select-movement { width: 100%; padding: 8px; margin-top: 10px; }
 .modal-actions { margin-top: 15px; text-align: right; }
 .modal-footer { margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 15px;}
+
+/* --- Estilos para Reseteo de Fábrica y Modales de Advertencia --- */
+
+.sidebar-footer a.sidebar-link-disabled {
+    color: #7f8c8d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.modal-title-warning {
+    color: #e74c3c;
+    border-bottom: 1px solid #e74c3c;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+#factory-reset-confirm-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}

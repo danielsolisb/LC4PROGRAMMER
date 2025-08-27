@@ -142,7 +142,7 @@ class Api:
         except queue.Empty:
             # Si la cola está vacía, simplemente devuelve None.
             return None
-
+    
     def perform_full_capture(self):
         """
         Esta función no cambia. Su único trabajo es lanzar la captura en un hilo.
@@ -224,6 +224,51 @@ class Api:
         except Exception as e:
             return {'status': 'error', 'message': f'Error interno: {e}'}
 
+    def factory_reset(self):
+        """Envía el comando de reseteo de fábrica al controlador."""
+        if not self._communicator.is_connected:
+            return {'status': 'error', 'message': 'No hay conexión con el controlador.'}
+        
+        print("API: Enviando comando de Reseteo de Fábrica (0xF0)...")
+        # El payload es vacío para este comando.
+        response = self._communicator.send_command(0xF0)
+
+        # El firmware responde con un ACK (0x06) en el campo 'data'.
+        # Lo verificamos para confirmar que el comando fue aceptado.
+        if response.get('status') == 'success' and response.get('data') == '\x06':
+            print("API: Reseteo de Fábrica confirmado por el controlador.")
+            return {'status': 'success', 'message': 'El controlador ha sido restablecido a los valores de fábrica.'}
+        else:
+            print("API: Falló el comando de Reseteo de Fábrica.")
+            return {'status': 'error', 'message': 'El controlador no confirmó el reseteo.'}
+
+    def upload_configuration(self, project_json):
+        """Recibe los datos del frontend y orquesta la subida al controlador."""
+        if not self._communicator.is_connected:
+            return {'status': 'error', 'message': 'No hay conexión con el controlador.'}
+        
+        try:
+            project_data = json.loads(project_json)
+            hardware_config = project_data.get('hardware_config', {})
+            
+            # Lanzamos la subida en un hilo para no bloquear la UI
+            # y devolvemos el resultado a través de la cola.
+            upload_thread = threading.Thread(
+                target=self._background_upload_task, 
+                args=(hardware_config,)
+            )
+            upload_thread.start()
+            
+            # Devolvemos un estado inicial para que el frontend sepa que el proceso comenzó
+            return {'status': 'pending', 'message': 'Subida iniciada...'}
+        except Exception as e:
+            return {'status': 'error', 'message': f'Error procesando los datos: {e}'}
+
+    def _background_upload_task(self, hardware_config):
+        """Tarea que se ejecuta en segundo plano para subir los datos."""
+        result = self._controller.upload_full_configuration(hardware_config)
+        # Usamos la misma cola que la captura para comunicar el resultado
+        ui_queue.put(json.dumps(result))
 
 def start_server():
     httpd = socketserver.TCPServer(("", PORT), Handler)

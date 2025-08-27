@@ -2,7 +2,7 @@
 
 import { getProjectData } from '../store.js';
 import { api } from '../api.js';
-import { LIGHT_MAP } from '../constants.js'; // Importamos LIGHT_MAP
+import { LIGHT_MAP, DAY_TYPE_LEGEND } from '../constants.js'; // Importamos LIGHT_MAP
 
 // --- VARIABLES GLOBALES Y CONSTANTES DE LA VISTA ---
 let map;
@@ -37,6 +37,7 @@ function setupTabSwitching() {
     const tabContents = document.querySelectorAll('.config-tab-content');
     let isIntersectionTabInitialized = false;
     let isSequencesTabInitialized = false;
+    let isSchedulingTabInitialized = false; // Nueva variable
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -50,13 +51,17 @@ function setupTabSwitching() {
                     initializeIntersectionTab();
                     isIntersectionTabInitialized = true;
                 } else if (map) {
-                    // Si la pestaña ya se inicializó, solo refrescamos el tamaño del mapa
                     setTimeout(() => map.invalidateSize(), 150);
                 }
             } else if (tab.dataset.tab === 'tab-sequences') {
                 if (!isSequencesTabInitialized) {
                     initializeSequencesTab();
                     isSequencesTabInitialized = true;
+                }
+            } else if (tab.dataset.tab === 'tab-scheduling') { // Nuevo bloque
+                if (!isSchedulingTabInitialized) {
+                    initializeSchedulingTab();
+                    isSchedulingTabInitialized = true;
                 }
             }
         });
@@ -436,36 +441,60 @@ function initializeSequencesTab() {
 function renderSequenceList() {
     const container = document.getElementById('sequence-list-container');
     const hardware = getProjectData().hardware_config;
-    container.innerHTML = ''; 
+    container.innerHTML = '';
 
     hardware.sequences.forEach(seq => {
         const seqBlock = document.createElement('div');
         seqBlock.className = 'sequence-block';
 
-        // --- MODIFICACIÓN AQUÍ ---
-        // Se añade un span para mostrar el tipo de secuencia.
-        const sequenceType = (seq.type === 0) ? 'Automática' : 'Bajo Demanda';
-        
+        const isDemand = seq.type === 1;
+        const optionsHTML = `
+            <option value="0" ${!isDemand ? 'selected' : ''}>Automática</option>
+            <option value="1" ${isDemand ? 'selected' : ''}>Bajo Demanda</option>
+        `;
+
+        // Contenedor para las reglas, se mostrará solo si es "Bajo Demanda"
+        const rulesContainerHTML = `
+            <div class="flow-rule-container" style="display: ${isDemand ? 'block' : 'none'};">
+                <h6>Reglas de Flujo</h6>
+                <ul class="flow-rule-list" id="rule-list-${seq.id}"></ul>
+                <button class="tool-btn add-rule-btn" data-seq-id="${seq.id}">Añadir Regla</button>
+            </div>
+        `;
+
         seqBlock.innerHTML = `
             <div class="sequence-header">
-                <h6>Secuencia ${seq.id} <span class="sequence-type">(${sequenceType})</span></h6>
+                <h6>Secuencia ${seq.id}
+                    <select class="sequence-type-selector" data-seq-id="${seq.id}">${optionsHTML}</select>
+                </h6>
                 <button class="delete-btn" data-seq-id="${seq.id}">Eliminar</button>
             </div>
             <ul class="movement-list" id="movement-list-${seq.id}"></ul>
             <button class="tool-btn add-movement-btn" data-seq-id="${seq.id}">Añadir Movimiento</button>
+            ${rulesContainerHTML}
         `;
-        
+
+        // Renderizar lista de movimientos
         const movementList = seqBlock.querySelector(`#movement-list-${seq.id}`);
         seq.movements.forEach(movId => {
             const li = document.createElement('li');
             li.className = 'movement-item';
             li.dataset.movId = movId;
             li.dataset.seqId = seq.id;
-            li.innerHTML = `
-                <span>Movimiento ${movId}</span>
-                <button class="delete-btn" data-seq-id="${seq.id}" data-mov-id="${movId}">X</button>
-            `;
+            li.innerHTML = `<span>Movimiento ${movId}</span><button class="delete-btn" data-seq-id="${seq.id}" data-mov-id="${movId}">X</button>`;
             movementList.appendChild(li);
+        });
+
+        // Renderizar lista de reglas de flujo
+        const ruleList = seqBlock.querySelector(`#rule-list-${seq.id}`);
+        const rulesForSeq = hardware.flow_rules.filter(rule => rule.sequence_id === seq.id);
+        rulesForSeq.forEach(rule => {
+            const li = document.createElement('li');
+            li.className = 'flow-rule-item';
+            li.dataset.ruleId = rule.id;
+            li.innerHTML = `<span>Regla ${rule.id}: Mov.${rule.origin_mov_id} 
+                → Mov.${rule.destination_mov_id}</span><button class="delete-btn" data-rule-id="${rule.id}">X</button>`;
+            ruleList.appendChild(li);
         });
 
         container.appendChild(seqBlock);
@@ -476,42 +505,83 @@ function renderSequenceList() {
 
 /**
  * Añade todos los event listeners a los elementos de la lista de secuencias.
+ * VERSIÓN UNIFICADA Y CORREGIDA
  */
 function addSequenceListListeners() {
+    // --- Listeners Generales ---
+    // Cambiar el tipo de secuencia (Automática / Bajo Demanda)
+    document.querySelectorAll('.sequence-type-selector').forEach(selector => {
+        selector.addEventListener('change', (e) => {
+            const seqId = parseInt(e.target.dataset.seqId, 10);
+            const newType = parseInt(e.target.value, 10);
+            const sequence = getProjectData().hardware_config.sequences.find(s => s.id === seqId);
+            if (sequence) {
+                sequence.type = newType;
+                renderSequenceList(); // Re-dibuja para mostrar/ocultar el panel de reglas
+            }
+        });
+    });
+
+    // Eliminar una secuencia completa
     document.querySelectorAll('.sequence-header .delete-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSequence(parseInt(e.target.dataset.seqId, 10)); }));
-
-    document.querySelectorAll('.add-movement-btn').forEach(btn => btn.addEventListener('click', (e) => { 
-        e.stopPropagation(); 
-        const seqId = parseInt(e.target.dataset.seqId, 10);
-        if(window.showAddMovementModal) {
-            window.showAddMovementModal(seqId);
-        }
-    }));
-
+    
+    // Abrir el modal para añadir un movimiento
+    document.querySelectorAll('.add-movement-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); if(window.showAddMovementModal) window.showAddMovementModal(parseInt(e.target.dataset.seqId, 10)); }));
+    
+    // --- Listeners para MOVIMIENTOS ---
+    // Seleccionar un item de movimiento
     document.querySelectorAll('.movement-item').forEach(item => {
         item.addEventListener('click', () => {
-            document.querySelectorAll('.movement-item.active').forEach(i => i.classList.remove('active'));
+            document.querySelectorAll('.movement-item.active, .flow-rule-item.active').forEach(i => i.classList.remove('active'));
             item.classList.add('active');
+            
             const movId = parseInt(item.dataset.movId, 10);
             const seqId = parseInt(item.dataset.seqId, 10);
-            renderMovementEditor(movId);
-            renderSequenceVisualizer(seqId, 0); 
+            
+            renderMovementEditor(movId); // Muestra el editor de movimiento
+            renderSequenceVisualizer(seqId, 0); // Dibuja el visualizador de la secuencia
         });
     });
 
-    // --- INICIO DE LA CORRECCIÓN ---
-    // Se corrige el typo de "movid" a "movId" para que coincida con el HTML
-    document.querySelectorAll('.movement-item .delete-btn').forEach(btn => {
+    // Eliminar un movimiento de una secuencia
+    document.querySelectorAll('.movement-item .delete-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); handleDeleteMovement(parseInt(e.target.dataset.seqId, 10), parseInt(e.target.dataset.movId, 10)); }));
+
+    // --- Listeners para REGLAS DE FLUJO ---
+    // Añadir una nueva regla de flujo
+    document.querySelectorAll('.add-rule-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            handleDeleteMovement(
-                parseInt(e.target.dataset.seqId, 10),
-                parseInt(e.target.dataset.movId, 10) // Corregido aquí
-            );
+            handleAddFlowRule(parseInt(e.target.dataset.seqId, 10));
         });
     });
-    // --- FIN DE LA CORRECCIÓN ---
+
+    // Seleccionar un item de regla de flujo
+    document.querySelectorAll('.flow-rule-item').forEach(item => {
+        item.addEventListener('click', () => {
+            document.querySelectorAll('.movement-item.active, .flow-rule-item.active').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            const ruleId = parseInt(item.dataset.ruleId, 10);
+            
+            renderFlowRuleEditor(ruleId); // Muestra el editor de la regla
+            
+            // Muestra también el visualizador para dar contexto
+            const rule = getProjectData().hardware_config.flow_rules.find(r => r.id === ruleId);
+            if (rule) {
+                renderSequenceVisualizer(rule.sequence_id, 0);
+            }
+        });
+    });
+
+    // Eliminar una regla de flujo
+    document.querySelectorAll('.flow-rule-item .delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteFlowRule(parseInt(e.target.dataset.ruleId, 10));
+        });
+    });
 }
+
 
 /**
  * Renderiza el editor para un movimiento específico en la columna derecha.
@@ -696,7 +766,22 @@ function handleDeleteSequence(seqId) {
 }
 
 function handleDeleteMovement(seqId, movId) {
-    // Se usa window.confirm para asegurar compatibilidad
+    // --- LÓGICA DE BLOQUEO (OPCIÓN C) ---
+    const isUsedByIntermittence = getProjectData().hardware_config.intermittences.some(inter => {
+        const plan = getProjectData().hardware_config.plans.find(p => p.id === inter.id_plan);
+        if (plan) {
+            const sequence = getProjectData().hardware_config.sequences.find(s => s.id === plan.sequence_id);
+            return sequence && sequence.id === seqId && inter.indice_mov === movId;
+        }
+        return false;
+    });
+
+    if (isUsedByIntermittence) {
+        alert(`Error: No se puede quitar el Movimiento ${movId} porque está siendo utilizado por una o más Reglas de Intermitencia. Por favor, elimine esas reglas primero desde la pestaña 'Programación y Agenda'.`);
+        return;
+    }
+    // --- FIN DE LA LÓGICA DE BLOQUEO ---
+
     if (!window.confirm(`¿Estás seguro de que quieres quitar el Movimiento ${movId} de la Secuencia ${seqId}?`)) {
         return;
     }
@@ -711,11 +796,8 @@ function handleDeleteMovement(seqId, movId) {
         }
     }
 
-    // Limpiamos los paneles de la derecha.
     document.getElementById('movement-editor-panel').innerHTML = '<p class="placeholder-text">Seleccione un movimiento de la lista para comenzar a editar.</p>';
     document.getElementById('sequence-visualizer-container').style.display = 'none';
-
-    // Volvemos a dibujar la lista para que el cambio se refleje.
     renderSequenceList();
 }
 // --- FUNCIONES AUXILIARES DE CONVERSIÓN (HEX <-> ESTADOS DE LUZ) ---
@@ -877,6 +959,7 @@ function updateConflictRestraints(editorPanel) {
  * @param {number} seqId - El ID de la secuencia a visualizar.
  * @param {number} timeIndex - El índice del tiempo (0-4) a utilizar para las duraciones.
  */
+/*
 function renderSequenceVisualizer(seqId, timeIndex) {
     const hardware = getProjectData().hardware_config;
     const sequence = hardware.sequences.find(s => s.id === seqId);
@@ -974,6 +1057,7 @@ function renderSequenceVisualizer(seqId, timeIndex) {
         renderSequenceVisualizer(seqId, parseInt(e.target.value, 10));
     });
 }
+    */
 /**
  * Inicializa los listeners y la lógica para el modal de añadir movimiento.
  */
@@ -1047,3 +1131,596 @@ function setupAddMovementModal() {
 // =================================================================================
 // --- FIN: NUEVAS FUNCIONES AÑADIDAS ---
 // =================================================================================
+
+/**
+ * Maneja la creación de una nueva regla de flujo para una secuencia.
+ * @param {number} seqId - El ID de la secuencia.
+ */
+function handleAddFlowRule(seqId) {
+    const hardware = getProjectData().hardware_config;
+    const nextRuleId = hardware.flow_rules.reduce((max, rule) => Math.max(max, rule.id), -1) + 1;
+
+    const newRule = {
+        id: nextRuleId,
+        sequence_id: seqId,
+        origin_mov_id: 0,
+        rule_type: 0, // GOTO por defecto
+        demand_mask: 0,
+        destination_mov_id: 0
+    };
+
+    hardware.flow_rules.push(newRule);
+    renderSequenceList();
+    setTimeout(() => { document.querySelector(`.flow-rule-item[data-rule-id="${nextRuleId}"]`)?.click(); }, 100);
+}
+
+/**
+ * Maneja la eliminación de una regla de flujo.
+ * @param {number} ruleId - El ID de la regla a eliminar.
+ */
+function handleDeleteFlowRule(ruleId) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar la Regla de Flujo ${ruleId}?`)) return;
+
+    const hardware = getProjectData().hardware_config;
+    const ruleIndex = hardware.flow_rules.findIndex(r => r.id === ruleId);
+
+    if (ruleIndex > -1) {
+        hardware.flow_rules.splice(ruleIndex, 1);
+        document.getElementById('movement-editor-panel').innerHTML = '<p class="placeholder-text">Seleccione un item de la lista para editar.</p>';
+        renderSequenceList();
+    }
+}
+
+/**
+ * Renderiza el editor para una REGLA DE FLUJO específica.
+ * @param {number} ruleId - El ID de la regla a editar.
+ */
+function renderFlowRuleEditor(ruleId) {
+    const hardware = getProjectData().hardware_config;
+    const rule = hardware.flow_rules.find(r => r.id === ruleId);
+    const editorPanel = document.getElementById('movement-editor-panel');
+    if (!rule) { editorPanel.innerHTML = '<p class="placeholder-text">Error: Regla no encontrada.</p>'; return; }
+
+    const sequence = hardware.sequences.find(s => s.id === rule.sequence_id);
+    const movementsInSeq = sequence ? sequence.movements : [];
+
+    // Opciones para los selectores de movimiento
+    let movOptions = movementsInSeq.map(movId => `<option value="${movId}">Movimiento ${movId}</option>`).join('');
+
+    // Checkboxes para la máscara de demanda
+    let demandCheckboxes = `
+        <div class="demand-mask-grid">
+            <label><input type="checkbox" data-bit="0" ${ (rule.demand_mask & 1) ? 'checked' : '' }> P1 (RB0)</label>
+            <label><input type="checkbox" data-bit="1" ${ (rule.demand_mask & 2) ? 'checked' : '' }> P2 (RB1)</label>
+            <label><input type="checkbox" data-bit="2" ${ (rule.demand_mask & 4) ? 'checked' : '' }> P3 (RB2)</label>
+            <label><input type="checkbox" data-bit="3" ${ (rule.demand_mask & 8) ? 'checked' : '' }> P4 (RB3)</label>
+        </div>
+    `;
+
+    editorPanel.innerHTML = `
+        <h4>Editando Regla de Flujo ${rule.id}</h4>
+        <div class="rule-editor-form">
+            <div class="form-group">
+                <label for="rule-origin-mov">Movimiento de Origen (Disparador)</label>
+                <select id="rule-origin-mov">${movOptions}</select>
+            </div>
+            <div class="form-group">
+                <label for="rule-type">Tipo de Regla</label>
+                <select id="rule-type">
+                    <option value="0" ${rule.rule_type === 0 ? 'selected' : ''}>GOTO (Salto Incondicional)</option>
+                    <option value="1" ${rule.rule_type === 1 ? 'selected' : ''}>Punto de Decisión</option>
+                </select>
+            </div>
+            <div class="form-group" id="demand-mask-container" style="display: ${rule.rule_type === 1 ? 'block' : 'none'};">
+                <label>Condición de Demanda (se activa con CUALQUIERA de los seleccionados)</label>
+                ${demandCheckboxes}
+            </div>
+            <div class="form-group">
+                <label for="rule-dest-mov">Movimiento de Destino (Salto)</label>
+                <select id="rule-dest-mov">${movOptions}</select>
+            </div>
+        </div>
+    `;
+
+    // Asignar valores y listeners
+    document.getElementById('rule-origin-mov').value = rule.origin_mov_id;
+    document.getElementById('rule-dest-mov').value = rule.destination_mov_id;
+
+    document.getElementById('rule-origin-mov').addEventListener('change', (e) => { rule.origin_mov_id = parseInt(e.target.value, 10); renderSequenceList(); });
+    document.getElementById('rule-dest-mov').addEventListener('change', (e) => { rule.destination_mov_id = parseInt(e.target.value, 10); renderSequenceList(); });
+    
+    const typeSelector = document.getElementById('rule-type');
+    typeSelector.addEventListener('change', (e) => {
+        rule.rule_type = parseInt(e.target.value, 10);
+        document.getElementById('demand-mask-container').style.display = rule.rule_type === 1 ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('#demand-mask-container input').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            let newMask = 0;
+            document.querySelectorAll('#demand-mask-container input:checked').forEach(cb => {
+                newMask |= (1 << parseInt(cb.dataset.bit, 10));
+            });
+            rule.demand_mask = newMask;
+        });
+    });
+}
+
+/**
+ * Mejora la función de renderizado del visualizador para incluir las reglas de flujo.
+ */
+function renderSequenceVisualizer(seqId, timeIndex) {
+    const hardware = getProjectData().hardware_config;
+    const sequence = hardware.sequences.find(s => s.id === seqId);
+    const visualizerContainer = document.getElementById('sequence-visualizer-container');
+    if (!sequence || sequence.movements.length === 0) { visualizerContainer.style.display = 'none'; return; }
+
+    const cycleMovements = sequence.movements.map(movId => hardware.movements.find(m => m.id === movId)).filter(Boolean);
+    const totalCycleTime = cycleMovements.reduce((total, mov) => total + (mov.times[timeIndex] || 0), 0);
+
+    visualizerContainer.style.display = 'block';
+    visualizerContainer.innerHTML = `
+        <div class="sequence-visualizer-header">
+            <h5>Visualización de Secuencia ${seqId}</h5>
+            <div class="visualizer-controls">
+                <label for="visualizer-time-select">Índice de Tiempo:</label>
+                <select id="visualizer-time-select">
+                    <option value="0" ${timeIndex === 0 ? 'selected' : ''}>T0</option>
+                    <option value="1" ${timeIndex === 1 ? 'selected' : ''}>T1</option>
+                    <option value="2" ${timeIndex === 2 ? 'selected' : ''}>T2</option>
+                    <option value="3" ${timeIndex === 3 ? 'selected' : ''}>T3</option>
+                    <option value="4" ${timeIndex === 4 ? 'selected' : ''}>T4</option>
+                </select>
+                <span><b>Ciclo Total:</b> ${totalCycleTime}s</span>
+            </div>
+        </div>
+        <div class="timeline-wrapper" id="sequence-timeline-wrapper">
+            <div class="timeline-grid-container" id="sequence-timeline-grid"></div>
+        </div>
+    `;
+
+    const gridContainer = document.getElementById('sequence-timeline-grid');
+    if (totalCycleTime > 0) {
+        let gridHTML = '';
+        const majorTickInterval = totalCycleTime > 100 ? 10 : (totalCycleTime > 30 ? 5 : 2);
+        const backgroundStyle = `background-image: repeating-linear-gradient(to right, #f0f0f0, #f0f0f0 1px, transparent 1px, transparent calc(${100/totalCycleTime}%)), repeating-linear-gradient(to right, #ccc, #ccc 1px, transparent 1px, transparent calc(${majorTickInterval*100/totalCycleTime}%));`;
+        gridHTML += `<div class="timeline-bars-area" style="${backgroundStyle}"></div>`;
+        gridHTML += `<div class="grid-cell header grid-label">Etapa</div><div class="grid-cell header timeline-stages-content">`;
+        
+        let accumulatedTime = 0;
+        cycleMovements.forEach(mov => {
+            const duration = mov.times[timeIndex] || 0;
+            if (duration > 0) {
+                const startPercent = (accumulatedTime / totalCycleTime) * 100;
+                const widthPercent = (duration / totalCycleTime) * 100;
+                // --- MODIFICACIÓN: Añadir indicador para reglas de flujo ---
+                const isOrigin = hardware.flow_rules.some(r => r.sequence_id === seqId && r.origin_mov_id === mov.id);
+                const ruleIcon = isOrigin ? ' 决策' : ''; // Icono para punto de decisión
+                gridHTML += `<div class="stage-separator" style="left: ${startPercent}%;"></div><span class="stage-label" style="left: ${startPercent + (widthPercent / 2)}%;">Mov. ${mov.id}${ruleIcon}</span>`;
+                accumulatedTime += duration;
+            }
+        });
+        gridHTML += '</div>';
+
+        for (let i = 1; i <= 8; i++) {
+            gridHTML += `<div class="grid-cell grid-label">G${i}</div><div class="grid-cell timeline-bar-container">`;
+            cycleMovements.forEach(mov => {
+                const duration = mov.times[timeIndex] || 0;
+                if (duration === 0) return;
+                const status = getGroupStatus(mov, i);
+                let colorClass = 'gray';
+                if (Object.values(status).filter(Boolean).length > 1) colorClass = 'violet';
+                else if (status.green) colorClass = 'green';
+                else if (status.amber) colorClass = 'amber';
+                else if (status.red) colorClass = 'red';
+                const widthPercent = (duration / totalCycleTime) * 100;
+                gridHTML += `<div class="timeline-segment ${colorClass}" style="width: ${widthPercent}%" title="G${i}, Mov ${mov.id}, ${duration}s"></div>`;
+            });
+            gridHTML += `</div>`;
+        }
+        gridContainer.innerHTML = gridHTML;
+    }
+
+    document.getElementById('visualizer-time-select').addEventListener('change', (e) => {
+        renderSequenceVisualizer(seqId, parseInt(e.target.value, 10));
+    });
+}
+
+
+// =================================================================================
+// --- PESTAÑA 3: PROGRAMACIÓN Y AGENDA ---
+// =================================================================================
+
+function initializeSchedulingTab() {
+    renderPlanList();
+    document.getElementById('add-plan-btn').addEventListener('click', handleAddPlan);
+    // NUEVO: Inicializamos también el panel de intermitencias
+    renderIntermittencePanel();
+}
+
+/**
+ * Renderiza la lista de planes en la columna izquierda.
+ */
+function renderPlanList() {
+    const container = document.getElementById('plan-list-container');
+    const plans = getProjectData().hardware_config.plans;
+    container.innerHTML = '';
+
+    // Ordenamos los planes por hora para una mejor visualización
+    const sortedPlans = [...plans].sort((a, b) => a.hour - b.hour || a.minute - b.minute);
+
+    sortedPlans.forEach(plan => {
+        const item = document.createElement('div');
+        item.className = 'plan-item';
+        item.dataset.planId = plan.id;
+
+        const dayText = DAY_TYPE_LEGEND[plan.day_type_id] || 'Desconocido';
+        const timeText = `${String(plan.hour).padStart(2, '0')}:${String(plan.minute).padStart(2, '0')}`;
+
+        item.innerHTML = `
+            <div class="plan-item-summary">
+                <span class="plan-item-title">Plan #${plan.id}</span>
+                <span class="plan-item-details">Sec. ${plan.sequence_id}, T${plan.time_sel} | ${dayText} @ ${timeText}</span>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+
+    // Añadir listeners para seleccionar un plan
+    container.querySelectorAll('.plan-item').forEach(item => {
+        item.addEventListener('click', () => {
+            container.querySelectorAll('.plan-item.active').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            renderPlanEditor(parseInt(item.dataset.planId, 10));
+        });
+    });
+}
+
+/**
+ * Renderiza el editor para un plan específico en la columna derecha.
+ * @param {number} planId - El ID del plan a editar.
+ */
+function renderPlanEditor(planId) {
+    const hardware = getProjectData().hardware_config;
+    const plan = hardware.plans.find(p => p.id === planId);
+    const editorContainer = document.getElementById('plan-editor-container');
+    if (!plan) {
+        editorContainer.innerHTML = '<p class="placeholder-text">Error: Plan no encontrado.</p>';
+        return;
+    }
+
+    // Opciones para los selectores
+    const dayTypeOptions = Object.entries(DAY_TYPE_LEGEND).map(([id, text]) => `<option value="${id}">${id}: ${text}</option>`).join('');
+    const sequenceOptions = hardware.sequences.map(seq => `<option value="${seq.id}">Secuencia ${seq.id}</option>`).join('');
+    const timeOptions = [0, 1, 2, 3, 4].map(i => `<option value="${i}">T${i}</option>`).join('');
+
+    editorContainer.innerHTML = `
+        <h4>Editando Plan #${plan.id}</h4>
+        <div class="form-group">
+            <label>Hora de Inicio</label>
+            <div class="time-editor-group">
+                <input type="number" id="plan-hour" value="${plan.hour}" min="0" max="23" placeholder="Hora">
+                <input type="number" id="plan-minute" value="${plan.minute}" min="0" max="59" placeholder="Minuto">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="plan-day-type">Días de Aplicación</label>
+            <select id="plan-day-type">${dayTypeOptions}</select>
+        </div>
+        <div class="form-group">
+            <label for="plan-sequence">Secuencia a Ejecutar</label>
+            <select id="plan-sequence">${sequenceOptions}</select>
+        </div>
+        <div class="form-group">
+            <label for="plan-time-sel">Índice de Tiempo</label>
+            <select id="plan-time-sel">${timeOptions}</select>
+        </div>
+        <button id="delete-plan-btn" class="delete-btn" style="width: 100%; padding: 10px;">Eliminar Plan</button>
+    `;
+
+    // Asignar valores actuales a los selectores
+    document.getElementById('plan-day-type').value = plan.day_type_id;
+    document.getElementById('plan-sequence').value = plan.sequence_id;
+    document.getElementById('plan-time-sel').value = plan.time_sel;
+
+    // Añadir listeners para guardar los cambios en tiempo real
+    const updatePlan = (key, value) => {
+        // Validación para evitar planes duplicados
+        if (key === 'hour' || key === 'minute' || key === 'day_type_id') {
+            const newHour = key === 'hour' ? value : plan.hour;
+            const newMinute = key === 'minute' ? value : plan.minute;
+            const newDayType = key === 'day_type_id' ? value : plan.day_type_id;
+            
+            const isDuplicate = hardware.plans.some(p => 
+                p.id !== plan.id &&
+                p.day_type_id === newDayType &&
+                p.hour === newHour &&
+                p.minute === newMinute
+            );
+            
+            if (isDuplicate) {
+                alert('Error: Ya existe un plan para el mismo tipo de día y hora de inicio. No se guardará el cambio.');
+                renderPlanList(); // Re-renderiza para restaurar la vista
+                document.querySelector(`.plan-item[data-plan-id="${plan.id}"]`)?.click();
+                return;
+            }
+        }
+        
+        plan[key] = value;
+        renderPlanList(); // Re-renderiza la lista para actualizar el resumen
+        document.querySelector(`.plan-item[data-plan-id="${plan.id}"]`)?.classList.add('active'); // Mantiene la selección activa
+    };
+
+    document.getElementById('plan-hour').addEventListener('input', (e) => updatePlan('hour', parseInt(e.target.value, 10) || 0));
+    document.getElementById('plan-minute').addEventListener('input', (e) => updatePlan('minute', parseInt(e.target.value, 10) || 0));
+    document.getElementById('plan-day-type').addEventListener('change', (e) => updatePlan('day_type_id', parseInt(e.target.value, 10)));
+    document.getElementById('plan-sequence').addEventListener('change', (e) => updatePlan('sequence_id', parseInt(e.target.value, 10)));
+    document.getElementById('plan-time-sel').addEventListener('change', (e) => updatePlan('time_sel', parseInt(e.target.value, 10)));
+    document.getElementById('delete-plan-btn').addEventListener('click', () => handleDeletePlan(plan.id));
+}
+
+/**
+ * Maneja la creación de un nuevo plan.
+ */
+function handleAddPlan() {
+    const hardware = getProjectData().hardware_config;
+    if (hardware.plans.length >= 20) {
+        alert("Error: Se ha alcanzado el número máximo de 20 planes.");
+        return;
+    }
+    
+    // Encontrar el ID más alto y sumarle 1
+    const nextId = hardware.plans.reduce((max, p) => Math.max(max, p.id), -1) + 1;
+    const newPlan = {
+        id: nextId,
+        day_type_id: 7, // Todos los días por defecto
+        hour: 0,
+        minute: 0,
+        sequence_id: hardware.sequences.length > 0 ? hardware.sequences[0].id : 0,
+        time_sel: 0
+    };
+
+    hardware.plans.push(newPlan);
+    renderPlanList();
+    // Seleccionar automáticamente el nuevo plan
+    setTimeout(() => { document.querySelector(`.plan-item[data-plan-id="${nextId}"]`)?.click(); }, 100);
+}
+
+/**
+ * Maneja la eliminación de un plan.
+ * @param {number} planId - El ID del plan a eliminar.
+ */
+function handleDeletePlan(planId) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el Plan #${planId}?`)) return;
+
+    const hardware = getProjectData().hardware_config;
+    const planIndex = hardware.plans.findIndex(p => p.id === planId);
+    
+    if (planIndex > -1) {
+        hardware.plans.splice(planIndex, 1);
+        document.getElementById('plan-editor-container').innerHTML = '<p class="placeholder-text">Seleccione un plan de la lista para comenzar a editar.</p>';
+        renderPlanList();
+    }
+}
+
+// =================================================================================
+// --- INICIO: NUEVAS FUNCIONES PARA GESTIÓN DE INTERMITENCIAS ---
+// =================================================================================
+
+/**
+ * Renderiza el panel completo de gestión de intermitencias.
+ */
+/**
+ * Renderiza el contenido del panel de gestión de intermitencias.
+ */
+function renderIntermittencePanel() {
+    // La estructura principal ya está en el HTML, solo necesitamos
+    // renderizar la lista y asignar el listener al botón.
+    renderIntermittenceList();
+    document.getElementById('add-intermittence-btn').addEventListener('click', handleAddIntermittence);
+}
+
+/**
+ * Renderiza la lista de reglas de intermitencia.
+ */
+function renderIntermittenceList() {
+    const container = document.getElementById('intermittence-list-container');
+    const intermittences = getProjectData().hardware_config.intermittences;
+    container.innerHTML = '';
+
+    intermittences.forEach(rule => {
+        const item = document.createElement('li');
+        item.className = 'intermittence-item';
+        item.dataset.ruleId = rule.id;
+        item.innerHTML = `
+            <span>Regla #${rule.id}: Plan ${rule.id_plan}, Mov. ${rule.indice_mov}</span>
+            <button class="delete-btn" data-rule-id="${rule.id}">X</button>
+        `;
+        container.appendChild(item);
+    });
+
+    // Listeners
+    container.querySelectorAll('.intermittence-item').forEach(item => {
+        item.addEventListener('click', () => {
+            container.querySelectorAll('.intermittence-item.active').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            renderIntermittenceEditor(parseInt(item.dataset.ruleId, 10));
+        });
+    });
+
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteIntermittence(parseInt(e.target.dataset.ruleId, 10));
+        });
+    });
+}
+
+/**
+ * Renderiza el editor para una regla de intermitencia.
+ * @param {number} ruleId - El ID de la regla a editar.
+ */
+function renderIntermittenceEditor(ruleId) {
+    const hardware = getProjectData().hardware_config;
+    const rule = hardware.intermittences.find(r => r.id === ruleId);
+    const editorContainer = document.getElementById('intermittence-editor-container');
+    if (!rule) { editorContainer.innerHTML = '<p class="placeholder-text">Error: Regla no encontrada.</p>'; return; }
+
+    const planOptions = hardware.plans.map(p => `<option value="${p.id}">Plan ${p.id}</option>`).join('');
+
+    editorContainer.innerHTML = `
+        <h6>Editando Regla de Intermitencia #${rule.id}</h6>
+        <div class="form-group">
+            <label for="inter-plan">Plan Vinculado</label>
+            <select id="inter-plan">${planOptions}</select>
+        </div>
+        <div class="form-group">
+            <label for="inter-mov">Movimiento Afectado</label>
+            <select id="inter-mov"></select>
+        </div>
+        <div class="form-group">
+            <label>Luces a Hacer Intermitentes</label>
+            <div class="lights-grid" id="inter-lights-grid"></div>
+        </div>
+    `;
+
+    const planSelector = document.getElementById('inter-plan');
+    const movSelector = document.getElementById('inter-mov');
+
+    // Función para actualizar el menú de movimientos y la cuadrícula de luces
+    const updateEditorFields = (selectedPlanId) => {
+        const plan = hardware.plans.find(p => p.id === selectedPlanId);
+        movSelector.innerHTML = ''; // Limpiar opciones
+
+        if (plan) {
+            const sequence = hardware.sequences.find(s => s.id === plan.sequence_id);
+            if (sequence) {
+                sequence.movements.forEach(movId => {
+                    movSelector.add(new Option(`Movimiento ${movId}`, movId));
+                });
+            }
+        }
+        
+        // Seleccionar el movimiento guardado si aún existe en la lista
+        const currentMovId = rule.indice_mov;
+        if (Array.from(movSelector.options).some(opt => opt.value == currentMovId)) {
+            movSelector.value = currentMovId;
+        } else {
+            // Si el movimiento guardado ya no es válido, seleccionamos el primero y actualizamos el objeto
+            rule.indice_mov = movSelector.options.length > 0 ? parseInt(movSelector.options[0].value, 10) : 0;
+        }
+
+        updateLightsGrid(rule.indice_mov);
+    };
+
+    // Función para actualizar la cuadrícula de checkboxes
+    const updateLightsGrid = (selectedMovId) => {
+        const lightsGrid = document.getElementById('inter-lights-grid');
+        const movement = hardware.movements.find(m => m.id === selectedMovId);
+        lightsGrid.innerHTML = '';
+        if (!movement) return;
+
+        const activeLights = hexPortsToLightStates(movement);
+        
+        for (let i = 1; i <= 8; i++) {
+            let groupHTML = `<div class="light-group">`;
+            ['R', 'A', 'V'].forEach(lightType => {
+                const lightId = `${lightType}${i}`;
+                if (LIGHT_MAP[lightId]) {
+                    const isEnabled = activeLights[lightId]; // La luz está encendida en el movimiento?
+                    const isChecked = (parseInt(rule[`mask${LIGHT_MAP[lightId].port.slice(-1).toUpperCase()}`], 16) & (1 << LIGHT_MAP[lightId].bit)) !== 0;
+
+                    groupHTML += `
+                        <div class="light-control ${!isEnabled ? 'disabled' : ''}">
+                            <input type="checkbox" id="inter-check-${lightId}" data-light-id="${lightId}" ${isChecked ? 'checked' : ''} ${!isEnabled ? 'disabled' : ''}>
+                            <label for="inter-check-${lightId}" class="light-label-${lightType}">${lightType}</label>
+                        </div>
+                    `;
+                }
+            });
+            groupHTML += `</div>`;
+            lightsGrid.innerHTML += groupHTML;
+        }
+
+        // Añadir listeners a los nuevos checkboxes
+        lightsGrid.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const masks = { D: 0, E: 0, F: 0 };
+                lightsGrid.querySelectorAll('input:checked').forEach(cb => {
+                    const lightInfo = LIGHT_MAP[cb.dataset.lightId];
+                    masks[lightInfo.port.slice(-1).toUpperCase()] |= (1 << lightInfo.bit);
+                });
+                
+                rule.maskD = masks.D.toString(16).padStart(2, '0').toUpperCase();
+                rule.maskE = masks.E.toString(16).padStart(2, '0').toUpperCase();
+                rule.maskF = masks.F.toString(16).padStart(2, '0').toUpperCase();
+                
+                // Aplicar/quitar animación
+                const label = checkbox.nextElementSibling;
+                label.classList.toggle('blinking', checkbox.checked);
+            });
+            // Aplicar animación inicial
+            const label = checkbox.nextElementSibling;
+            label.classList.toggle('blinking', checkbox.checked);
+        });
+    };
+
+    // Listeners principales
+    planSelector.addEventListener('change', () => {
+        const newPlanId = parseInt(planSelector.value, 10);
+        rule.id_plan = newPlanId;
+        updateEditorFields(newPlanId);
+        renderIntermittenceList(); // Actualizar el resumen
+    });
+
+    movSelector.addEventListener('change', () => {
+        const newMovId = parseInt(movSelector.value, 10);
+        rule.indice_mov = newMovId;
+        updateLightsGrid(newMovId);
+        renderIntermittenceList(); // Actualizar el resumen
+    });
+
+    // Carga inicial
+    planSelector.value = rule.id_plan;
+    updateEditorFields(rule.id_plan);
+}
+
+/**
+ * Maneja la creación de una nueva regla de intermitencia.
+ */
+function handleAddIntermittence() {
+    const hardware = getProjectData().hardware_config;
+    if (hardware.intermittences.length >= 10) {
+        alert("Error: Se ha alcanzado el número máximo de 10 reglas de intermitencia.");
+        return;
+    }
+
+    const nextId = hardware.intermittences.reduce((max, r) => Math.max(max, r.id), -1) + 1;
+    const newRule = {
+        id: nextId,
+        id_plan: hardware.plans.length > 0 ? hardware.plans[0].id : 0,
+        indice_mov: 0,
+        maskD: "00", maskE: "00", maskF: "00"
+    };
+
+    hardware.intermittences.push(newRule);
+    renderIntermittenceList();
+    setTimeout(() => { document.querySelector(`.intermittence-item[data-rule-id="${nextId}"]`)?.click(); }, 100);
+}
+
+/**
+ * Maneja la eliminación de una regla de intermitencia.
+ * @param {number} ruleId - El ID de la regla a eliminar.
+ */
+function handleDeleteIntermittence(ruleId) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar la Regla de Intermitencia #${ruleId}?`)) return;
+
+    const hardware = getProjectData().hardware_config;
+    const ruleIndex = hardware.intermittences.findIndex(r => r.id === ruleId);
+    
+    if (ruleIndex > -1) {
+        hardware.intermittences.splice(ruleIndex, 1);
+        document.getElementById('intermittence-editor-container').innerHTML = '<p class="placeholder-text">Seleccione una regla para editar.</p>';
+        renderIntermittenceList();
+    }
+}

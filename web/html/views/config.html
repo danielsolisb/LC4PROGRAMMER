@@ -90,9 +90,46 @@
 </div>
 
     <!-- PESTAÑA 3: PROGRAMACIÓN Y AGENDA (Contenido futuro) -->
-    <div id="tab-scheduling" class="config-tab-content">
-        <p>Contenido para la Programación y Agenda irá aquí.</p>
+<div id="tab-scheduling" class="config-tab-content">
+
+    <div class="scheduling-section">
+        <div class="scheduling-layout">
+            <div class="scheduling-sidebar">
+                <div class="config-panel">
+                    <h5>Planes Programados</h5>
+                    <div id="plan-list-container"></div>
+                    <button id="add-plan-btn" class="tool-btn">Añadir Nuevo Plan</button>
+                </div>
+            </div>
+            <div class="scheduling-main">
+                <div class="config-panel" id="plan-editor-container">
+                    <p class="placeholder-text">Seleccione un plan de la lista para editar.</p>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <hr class="section-divider">
+
+    <div class="scheduling-section">
+        <div class="intermittence-layout">
+            <div class="intermittence-sidebar">
+                 <div class="config-panel">
+                    <h5>Gestión de Reglas de Intermitencia</h5>
+                    <ul id="intermittence-list-container"></ul>
+                    <button id="add-intermittence-btn" class="tool-btn">Añadir Regla</button>
+                </div>
+            </div>
+            <div class="intermittence-main">
+                 <div class="config-panel" id="intermittence-editor-container">
+                    <p class="placeholder-text">Seleccione una regla para editar.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 </div>
 
 <!-- ELIMINADO: Los <script> de leaflet.js y rotatedMarker fueron removidos de aquí -->

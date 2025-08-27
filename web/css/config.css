@@ -423,3 +423,234 @@
     border-radius: 4px;
     margin-left: 5px;
 }
+
+/* ===================================================================== */
+/* --- ESTILOS PARA SECUENCIAS BAJO DEMANDA Y REGLAS DE FLUJO --- */
+/* ===================================================================== */
+
+/* Selector de tipo de secuencia */
+.sequence-type-selector {
+    font-size: 0.8em;
+    font-weight: normal;
+    color: #555;
+    background-color: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    margin-left: 5px;
+}
+
+/* Contenedor para la lista de reglas de flujo */
+.flow-rule-container {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #ccc;
+}
+
+.flow-rule-list {
+    list-style: none;
+    padding-left: 15px;
+    margin: 0 0 10px 0;
+}
+
+.flow-rule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.9em;
+}
+
+.flow-rule-item:hover {
+    background-color: #e9ecef;
+}
+
+.flow-rule-item.active {
+    background-color: #9b59b6; /* Un color distinto para las reglas */
+    color: white;
+    font-weight: bold;
+}
+
+/* Editor de Reglas de Flujo */
+.rule-editor-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.rule-editor-form .form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.demand-mask-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+
+/* ===================================================================== */
+/* --- ESTILOS PARA PESTAÑA 3: PROGRAMACIÓN Y AGENDA --- */
+/* ===================================================================== */
+
+.scheduling-layout {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 220px);
+}
+
+.scheduling-sidebar {
+    flex: 0 0 400px;
+    overflow-y: auto;
+}
+
+.scheduling-main {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+#plan-list-container {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.plan-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.plan-item:hover {
+    background-color: #f8f9fa;
+}
+
+.plan-item.active {
+    background-color: #3498db;
+    color: white;
+}
+
+.plan-item-summary {
+    display: flex;
+    flex-direction: column;
+}
+
+.plan-item-title {
+    font-weight: bold;
+}
+
+.plan-item-details {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+#plan-editor-container .form-group select,
+#plan-editor-container .form-group input {
+     width: 100%;
+     padding: 8px;
+     border: 1px solid #ccc;
+     border-radius: 4px;
+}
+
+.time-editor-group {
+    display: flex;
+    gap: 10px;
+}
+
+/* ===================================================================== */
+/* --- ESTILOS PARA GESTIÓN DE INTERMITENCIAS --- */
+/* ===================================================================== */
+
+#intermittence-panel-container {
+    margin-top: 20px;
+}
+
+.intermittence-layout {
+    display: flex;
+    gap: 20px;
+}
+
+.intermittence-sidebar {
+    flex: 0 0 300px;
+    border-right: 1px solid #e0e0e0;
+    padding-right: 20px;
+}
+
+.intermittence-main {
+    flex-grow: 1;
+}
+
+#intermittence-list-container {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.intermittence-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.intermittence-item:hover {
+    background-color: #f8f9fa;
+}
+
+.intermittence-item.active {
+    background-color: #1abc9c; /* Un color distintivo para intermitencias */
+    color: white;
+}
+
+/* Animación de parpadeo para las etiquetas de los checkboxes */
+@keyframes blink-animation {
+    50% { opacity: 0.3; }
+}
+
+.light-control input[type="checkbox"]:checked + label.blinking {
+    animation: blink-animation 1s step-end infinite;
+}
+
+/* ===================================================================== */
+/* --- NUEVOS ESTILOS PARA LA DIVISIÓN DE LA PESTAÑA 3 --- */
+/* ===================================================================== */
+
+#tab-scheduling.active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 180px); /* Altura total de la pestaña */
+}
+
+.scheduling-section {
+    flex: 1; /* Cada sección (Planes e Intermitencias) toma el 50% del espacio */
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.scheduling-layout, .intermittence-layout {
+    height: 100%;
+}
+
+.section-divider {
+    border: none;
+    border-top: 2px solid #3498db;
+    margin: 10px 0;
+}

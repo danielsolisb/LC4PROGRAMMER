@@ -28,7 +28,8 @@
             </nav>
             <div class="sidebar-footer">
                 <a href="#" onclick="handleSaveGlobal()">Guardar Global</a>
-                <a href="#">Subir al Controlador</a>
+                <a href="#" id="btn-upload" class="sidebar-link-disabled" onclick="handleUpload()">Subir al Controlador</a>
+                <a href="#" id="btn-factory-reset" class="sidebar-link-disabled" onclick="handleFactoryReset()">Restablecer de Fábrica</a>
                 <a href="#" id="btn-disconnect-app" onclick="handleAppDisconnect()">Desconectar</a>
                 <div id="app-status-indicator" class="status-indicator disconnected">
                     Desconectado
@@ -70,6 +71,22 @@
             </div>
             <div class="modal-footer">
                 <button id="modal-btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+  
+
+    <div id="factory-reset-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h4 class="modal-title-warning">¡Acción Destructiva!</h4>
+            <p>Estás a punto de **borrar permanentemente toda la configuración** del controlador conectado. Esta acción no se puede deshacer.</p>
+            <p>Para confirmar, por favor escribe la frase <strong>BORRAR TODO</strong> en el campo de abajo.</p>
+            <div class="form-group">
+                <input type="text" id="factory-reset-confirm-input" autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button id="factory-reset-cancel-btn">Cancelar</button>
+                <button id="factory-reset-confirm-btn" class="delete-btn" disabled>Confirmar Reseteo</button>
             </div>
         </div>
     </div>

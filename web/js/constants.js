@@ -31,3 +31,25 @@ export const PLAN_COLORS = [
     '#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6',
     '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
 ];
+
+// =======================================================
+// --- NUEVO: Constantes para la Programación de Planes ---
+// =======================================================
+
+export const DAY_TYPE_LEGEND = {
+    0: 'Domingo',
+    1: 'Lunes',
+    2: 'Martes',
+    3: 'Miércoles',
+    4: 'Jueves',
+    5: 'Viernes',
+    6: 'Sábado',
+    7: 'Todos los días',
+    8: 'Todos los días menos Domingos',
+    9: 'Sábado y Domingo',
+    10: 'Todos excepto Sábado y Domingo',
+    11: 'Viernes, Sábado y Domingo',
+    12: 'Todos menos Vie, Sáb, Dom',
+    13: 'Viernes y Sábado',
+    14: 'Feriados'
+};

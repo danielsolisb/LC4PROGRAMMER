@@ -117,6 +117,106 @@ async function runNewProjectFlow() {
     await loadView('dashboard', true);
 }
 
+/**
+ * Actualiza el estado (activado/desactivado) de los botones de la barra lateral
+ * según el estado de la conexión.
+ */
+function updateSidebarButtons(isConnected) {
+    const factoryResetBtn = document.getElementById('btn-factory-reset');
+    const uploadBtn = document.getElementById('btn-upload'); // ID que le daremos al botón
+
+    if (factoryResetBtn) {
+        factoryResetBtn.classList.toggle('sidebar-link-disabled', !isConnected);
+    }
+    if (uploadBtn) {
+        uploadBtn.classList.toggle('sidebar-link-disabled', !isConnected);
+    }
+}
+
+/**
+ * Orquesta el flujo de reseteo de fábrica.
+ */
+async function handleFactoryReset() {
+    const status = await api.getConnectionStatus();
+    if (!status.is_connected) return; // Doble chequeo de seguridad
+
+    const modal = document.getElementById('factory-reset-modal');
+    const confirmInput = document.getElementById('factory-reset-confirm-input');
+    const confirmBtn = document.getElementById('factory-reset-confirm-btn');
+    const cancelBtn = document.getElementById('factory-reset-cancel-btn');
+    const confirmationText = "BORRAR TODO";
+
+    // Resetear el estado del modal cada vez que se abre
+    confirmInput.value = "";
+    confirmBtn.disabled = true;
+    modal.classList.add('visible');
+
+    const onConfirm = async () => {
+        showLoadingModal(true);
+        modal.classList.remove('visible');
+        const result = await api.factoryReset();
+
+        if (result.status === 'success') {
+            alert("Reseteo de fábrica completado. El software se reiniciará con una nueva configuración.");
+            // Forzamos una recarga completa de la aplicación en modo "proyecto nuevo"
+            runNewProjectFlow();
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+        showLoadingModal(false);
+
+        // Limpiar listeners para evitar duplicados
+        confirmInput.removeEventListener('input', onInput);
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+    };
+
+    const onCancel = () => {
+        modal.classList.remove('visible');
+         // Limpiar listeners para evitar duplicados
+        confirmInput.removeEventListener('input', onInput);
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+    };
+
+    const onInput = () => {
+        confirmBtn.disabled = confirmInput.value !== confirmationText;
+    };
+
+    confirmInput.addEventListener('input', onInput);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+}
+
+/**
+ * Orquesta el flujo para subir la configuración al controlador.
+ */
+async function handleUpload() {
+    if (!confirm("¿Estás seguro de que quieres subir la configuración actual al controlador? Esto sobrescribirá todos los datos existentes en el dispositivo.")) {
+        return;
+    }
+
+    showLoadingModal(true, "Subiendo configuración, por favor espere...");
+    await api.uploadConfiguration(getProjectData());
+
+    // Usamos el mismo sistema de "poller" que la captura para esperar el resultado
+    const poller = setInterval(async () => {
+        try {
+            // Reutilizamos checkCaptureResult porque usa la misma cola (ui_queue)
+            const resultJson = await api.checkCaptureResult();
+            if (resultJson) {
+                clearInterval(poller);
+                const result = JSON.parse(resultJson);
+                showLoadingModal(false);
+                alert(result.message);
+            }
+        } catch (e) {
+            clearInterval(poller);
+            showLoadingModal(false);
+            alert("Ocurrió un error al verificar el resultado de la subida.");
+        }
+    }, 500); // Chequeamos cada medio segundo
+}
 
 // --- PUNTO DE ENTRADA PRINCIPAL ---
 
@@ -135,14 +235,18 @@ window.handleSaveGlobal = async () => {
     }
 };
 window.handleAppDisconnect = api.confirmAndDisconnect;
+// NUEVA ASIGNACIÓN
+window.handleFactoryReset = handleFactoryReset;
 
+window.handleUpload = handleUpload;
 
 // Evento que se dispara cuando la API de Python está lista.
 window.addEventListener('pywebviewready', async () => {
     console.log("EVENTO: pywebviewready -> La API y el DOM están listos.");
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-
+    const status = await api.getConnectionStatus();
+    updateSidebarButtons(status.is_connected);
     // Cargar siempre el dashboard primero para tener una base
     await loadView('dashboard');
 

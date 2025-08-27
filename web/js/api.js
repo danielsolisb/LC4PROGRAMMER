@@ -24,4 +24,7 @@ export const api = {
     startMonitoring: () => window.pywebview.api.start_monitoring(),
     stopMonitoring: () => window.pywebview.api.stop_monitoring(),
     checkMonitoringUpdate: () => window.pywebview.api.check_monitoring_update(),
+
+    factoryReset: () => window.pywebview.api.factory_reset(),
+    uploadConfiguration: (data) => window.pywebview.api.upload_configuration(JSON.stringify(data)),
 };

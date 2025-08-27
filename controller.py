@@ -281,3 +281,172 @@ class Controller:
             print(f"CONTROLLER: Error al guardar archivo: {e}")
             return {'status': 'error', 'message': str(e)}
 
+    # =================================================================================
+    # --- INICIO: NUEVAS FUNCIONES PARA SUBIR LA CONFIGURACIÓN ---
+    # =================================================================================
+    def _send_write_command(self, command, payload):
+        """Función auxiliar para enviar un comando de escritura y verificar el ACK."""
+        response = self._comm.send_command(command, data_payload=payload)
+        # El ACK del firmware es el carácter 0x06
+        if response.get('status') == 'success' and response.get('data') == '\x06':
+            return True
+        print(f"Error: No se recibió ACK para el comando 0x{command:02X}. Respuesta: {response.get('data')}")
+        return False
+
+    def _upload_movements(self, movements):
+        """Sube todos los movimientos al controlador."""
+        print("CONTROLLER: Escribiendo movimientos...")
+        for i in range(MAX_MOVEMENTS):
+            mov = next((m for m in movements if m['id'] == i), None)
+            payload = bytearray(11)
+            payload[0] = i
+            if mov:
+                payload[1] = int(mov['portD'], 16)
+                payload[2] = int(mov['portE'], 16)
+                payload[3] = int(mov['portF'], 16)
+                payload[4] = int(mov['portH'], 16)
+                payload[5] = int(mov['portJ'], 16)
+                for j in range(5):
+                    payload[6 + j] = mov['times'][j]
+            else:
+                # Si el movimiento no existe, lo llenamos con 0xFF (vacío)
+                for j in range(1, 11):
+                    payload[j] = 0xFF
+            
+            if not self._send_write_command(0x23, payload):
+                return {'status': 'error', 'message': f'Falló al escribir el movimiento {i}'}
+        return {'status': 'success'}
+
+    def _upload_sequences(self, sequences):
+        """Sube todas las secuencias al controlador."""
+        print("CONTROLLER: Escribiendo secuencias...")
+        for i in range(MAX_SEQUENCES):
+            seq = next((s for s in sequences if s['id'] == i), None)
+            payload = bytearray(16)
+            payload[0] = i
+            if seq:
+                payload[1] = seq['type']
+                payload[2] = seq['anchor_pos']
+                payload[3] = len(seq['movements'])
+                for j in range(12):
+                    if j < len(seq['movements']):
+                        payload[4 + j] = seq['movements'][j]
+                    else:
+                        payload[4 + j] = 0xFF # Rellenar con 0xFF
+            else:
+                for j in range(1, 16):
+                    payload[j] = 0xFF
+            
+            if not self._send_write_command(0x30, payload):
+                return {'status': 'error', 'message': f'Falló al escribir la secuencia {i}'}
+        return {'status': 'success'}
+
+    def _upload_plans(self, plans):
+        """Sube todos los planes al controlador."""
+        print("CONTROLLER: Escribiendo planes...")
+        for i in range(MAX_PLANS):
+            plan = next((p for p in plans if p['id'] == i), None)
+            payload = bytearray(6)
+            payload[0] = i
+            if plan:
+                payload[1] = plan['day_type_id']
+                payload[2] = plan['sequence_id']
+                payload[3] = plan['time_sel']
+                payload[4] = plan['hour']
+                payload[5] = plan['minute']
+            else:
+                # Un plan vacío tiene un tipo de día inválido (255)
+                for j in range(1, 6):
+                    payload[j] = 0xFF
+
+            if not self._send_write_command(0x40, payload):
+                return {'status': 'error', 'message': f'Falló al escribir el plan {i}'}
+        return {'status': 'success'}
+
+    def _upload_intermittences(self, intermittences):
+        """Sube todas las reglas de intermitencia."""
+        print("CONTROLLER: Escribiendo intermitencias...")
+        for i in range(MAX_INTERMITENCES):
+            rule = next((r for r in intermittences if r['id'] == i), None)
+            payload = bytearray(6)
+            payload[0] = i
+            if rule:
+                payload[1] = rule['id_plan']
+                payload[2] = rule['indice_mov']
+                payload[3] = int(rule['maskD'], 16)
+                payload[4] = int(rule['maskE'], 16)
+                payload[5] = int(rule['maskF'], 16)
+            else:
+                for j in range(1, 6):
+                    payload[j] = 0xFF
+            
+            if not self._send_write_command(0x50, payload):
+                return {'status': 'error', 'message': f'Falló al escribir la intermitencia {i}'}
+        return {'status': 'success'}
+
+    def _upload_holidays(self, holidays):
+        """Sube todos los feriados."""
+        print("CONTROLLER: Escribiendo feriados...")
+        for i in range(MAX_HOLIDAYS):
+            holiday = next((h for h in holidays if h['id'] == i), None)
+            payload = bytearray(3)
+            payload[0] = i
+            if holiday:
+                payload[1] = holiday['day']
+                payload[2] = holiday['month']
+            else:
+                # Un feriado inválido puede tener día 0
+                payload[1] = 0
+                payload[2] = 0
+
+            if not self._send_write_command(0x60, payload):
+                return {'status': 'error', 'message': f'Falló al escribir el feriado {i}'}
+        return {'status': 'success'}
+
+    def _upload_flow_rules(self, flow_rules):
+        """Sube todas las reglas de flujo."""
+        print("CONTROLLER: Escribiendo reglas de flujo...")
+        for i in range(MAX_FLOW_CONTROL_RULES):
+            rule = next((r for r in flow_rules if r['id'] == i), None)
+            payload = bytearray(6)
+            payload[0] = i
+            if rule:
+                payload[1] = rule['sequence_id']
+                payload[2] = rule['origin_mov_id']
+                payload[3] = rule['rule_type']
+                payload[4] = rule['demand_mask']
+                payload[5] = rule['destination_mov_id']
+            else:
+                for j in range(1, 6):
+                    payload[j] = 0xFF
+
+            if not self._send_write_command(0x70, payload):
+                return {'status': 'error', 'message': f'Falló al escribir la regla de flujo {i}'}
+        return {'status': 'success'}
+
+
+    def upload_full_configuration(self, hardware_config):
+        """
+        Orquesta el proceso completo de subida de la configuración.
+        El orden es importante para mantener la integridad referencial.
+        """
+        print("CONTROLLER: Iniciando subida de configuración completa...")
+        
+        # El orden es importante. Primero subimos los datos base (movimientos)
+        # y luego los que dependen de ellos (secuencias, planes, etc.)
+        upload_steps = [
+            (self._upload_movements, hardware_config.get('movements', [])),
+            (self._upload_sequences, hardware_config.get('sequences', [])),
+            (self._upload_plans, hardware_config.get('plans', [])),
+            (self._upload_intermittences, hardware_config.get('intermittences', [])),
+            (self._upload_holidays, hardware_config.get('holidays', [])),
+            (self._upload_flow_rules, hardware_config.get('flow_rules', []))
+        ]
+
+        for uploader, data in upload_steps:
+            result = uploader(data)
+            if result['status'] != 'success':
+                return result # Si un paso falla, detenemos todo y reportamos el error
+
+        print("CONTROLLER: Subida de configuración completada exitosamente.")
+        return {'status': 'success', 'message': 'Configuración subida al controlador exitosamente.'}

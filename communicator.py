@@ -15,8 +15,8 @@ class Communicator:
             try:
                 if self.ser and self.ser.is_open:
                     self.ser.close()
+                # El timeout de 1 segundo sigue siendo una buena salvaguarda.
                 self.ser = serial.Serial(port, int(baudrate), timeout=1)
-                # Damos un pequeño respiro para que el puerto se estabilice
                 time.sleep(0.1)
                 return {'status': 'success'}
             except serial.SerialException as e:
@@ -45,24 +45,39 @@ class Communicator:
         if not self.is_connected:
             return {'status': 'error', 'message': 'No hay una conexión activa.'}
 
+        WRITE_COMMANDS = {0x10, 0x22, 0x23, 0x30, 0x40, 0x50, 0x60, 0x70, 0xF0}
+        
         with self.lock:
             frame = self._build_frame(cmd_byte, data_payload)
             try:
                 self.ser.reset_input_buffer()
                 self.ser.write(frame)
                 print(f"Enviado: {frame.hex().upper()}")
-                time.sleep(0.06) 
-                # --- SOLUCIÓN DE LECTURA ROBUSTA ---
-                # Leemos hasta recibir un salto de línea, con un timeout de 1 segundo.
-                # Esto es mucho más fiable que una pausa fija.
-                response_bytes = self.ser.read_until(b'\n')
-                
-                if response_bytes:
-                    # Limpiamos la respuesta de caracteres de control y la decodificamos
-                    response_text = response_bytes.decode('ascii', errors='replace').strip()
-                    print(f"Respuesta Recibida: {response_text}")
-                    return {'status': 'success', 'data': response_text}
+
+                # --- INICIO DE LA SOLUCIÓN CORRECTA ---
+                # Pausa estratégica para dar tiempo al controlador a procesar,
+                # especialmente importante para comandos de escritura.
+                time.sleep(0.3)
+                # --- FIN DE LA SOLUCIÓN CORRECTA ---
+
+                if self.ser.in_waiting > 0:
+                    response_bytes = self.ser.read(self.ser.in_waiting)
+                    
+                    if cmd_byte in WRITE_COMMANDS:
+                        # Para comandos de escritura, solo nos importa si se recibió un ACK.
+                        if b'\x06' in response_bytes:
+                            print("Respuesta Recibida: ACK (0x06) detectado.")
+                            return {'status': 'success', 'data': '\x06'}
+                        else:
+                            print(f"ADVERTENCIA: Se esperaba ACK pero se recibió: {response_bytes.hex().upper()}")
+                            return {'status': 'error', 'message': 'No se recibió ACK del dispositivo.'}
+                    else:
+                        # Para comandos de lectura, devolvemos el texto.
+                        response_text = response_bytes.decode('ascii', errors='replace').strip()
+                        print(f"Respuesta Recibida: {response_text}")
+                        return {'status': 'success', 'data': response_text}
                 else:
+                    # Si después de la pausa no hay nada, es un timeout.
                     print(f"ADVERTENCIA: Timeout para el comando 0x{cmd_byte:02X}. No se recibió respuesta.")
                     return {'status': 'error', 'message': 'Timeout: No se recibió respuesta del dispositivo.'}
 
